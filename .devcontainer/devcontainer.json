@@ -1,0 +1,12 @@
+{
+  "name": "SeaMat",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.13-bookworm",
+  "postCreateCommand": "python -m pip install -r requirements-lock.txt",
+  "forwardPorts": [8088],
+  "portsAttributes": {
+    "8088": {
+      "label": "SeaMat",
+      "onAutoForward": "openBrowser"
+    }
+  }
+}

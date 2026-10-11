@@ -1,0 +1,18 @@
+services:
+  seamat:
+    build: .
+    ports:
+      - "8088:8088"
+    environment:
+      SEAMAT_HOST: 0.0.0.0
+      SEAMAT_PORT: 8088
+      SEAMAT_SHOW_BROWSER: 0
+      SEAMAT_EXTERNAL_URL: ${SEAMAT_EXTERNAL_URL:-http://localhost:8088}
+      SEAMAT_TEACHER_TOKEN: ${SEAMAT_TEACHER_TOKEN:-}
+      SEAMAT_REVIEW_TOKEN: ${SEAMAT_REVIEW_TOKEN:-}
+    volumes:
+      - seamat-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  seamat-data:
