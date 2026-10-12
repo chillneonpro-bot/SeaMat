@@ -84,6 +84,10 @@ def result_pdf(result: dict, title: str='Rapport SeaMat') -> bytes:
     y=height-175; y=_section(pdf,'Courbe de vieillissement',y); _chart(pdf,result,65,y-195,465,180); y-=220
     y=_section(pdf,'Validité du résultat',y)
     y=_text(pdf,diagnostic['level']+' - '+diagnostic['conclusion'],46,y,500,size=9,bold=True)
+    reliability=manifest.get('reliability') or {}
+    if reliability:
+        y=_text(pdf,'Qualification : '+str(reliability.get('label','Non évaluée')),46,y,500,size=8,bold=True)
+        y=_text(pdf,str(reliability.get('decision','')),46,y,500,size=8)
     for check in diagnostic['checks']:
         y=_text(pdf,f"{check['criterion']} : {check['finding']}",52,y,492,size=8)
     y=_text(pdf,'Expérience recommandée : '+diagnostic['recommended_experiment'],46,y-3,500,size=8,color=colors.HexColor('#7A4E00'))
@@ -146,6 +150,7 @@ def evidence_card_pdf(result: dict, title: str='Résultat SeaMat') -> bytes:
     manifest=result.get('manifest') or {}; inputs=manifest.get('inputs') or {}
     validity=manifest.get('validity') or {}; uncertainty=manifest.get('uncertainty') or {}
     diagnostic=validity_diagnostic(result); origin=curve_value_origin(result)
+    reliability=manifest.get('reliability') or {}
 
     pdf.setFillColor(BLUE); pdf.rect(0,height-92,width,92,fill=1,stroke=0)
     pdf.setFillColor(colors.white); pdf.setFont('Helvetica-Bold',20)
@@ -191,6 +196,9 @@ def evidence_card_pdf(result: dict, title: str='Résultat SeaMat') -> bytes:
 
     y-=2; y=_section(pdf,'Niveau de preuve et incertitude',y)
     y=_text(pdf,f"{diagnostic['level']} · {diagnostic['conclusion']}",46,y,500,size=8,bold=True)
+    if reliability:
+        y=_text(pdf,'Qualification : '+_short(reliability.get('label'),120),46,y,500,size=8,bold=True)
+        y=_text(pdf,_short(reliability.get('decision'),220),46,y,500,size=7.5)
     uncertainty_label=uncertainty.get('label') or 'Bande calculée, nature non renseignée'
     coverage=uncertainty.get('coverage') or ('statistique descriptive' if uncertainty.get('kind') else 'non documentée')
     y=_text(pdf,f'Bande : {uncertainty_label}. Couverture : {coverage}.',46,y,500,size=8)

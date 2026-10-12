@@ -70,7 +70,9 @@ def test_datasheet_estimator_uses_environment_and_reports_threshold():
     assert indoor['crossing_estimate_years'] > 0
     assert indoor['crossing_interval'][0] < indoor['crossing_estimate_years'] < indoor['crossing_interval'][1]
     assert indoor['crossing_interval'][1] / indoor['crossing_interval'][0] == pytest.approx(1.05/.95)
-    assert indoor['manifest']['status'].startswith('ESTIMATION DOCUMENTAIRE DE PRÉSÉLECTION')
+    assert indoor['manifest']['status'].startswith('NON QUALIFIÉ')
+    assert indoor['manifest']['reliability']['code']=='documentary_only'
+    assert indoor['manifest']['reliability']['usable_for_screening'] is False
     assert indoor['manifest']['evidence_level']=='exploratory_family_assumptions'
     assert indoor['manifest']['uncertainty']['kind']=='standardized_rate_sensitivity'
     assert indoor['manifest']['uncertainty']['rate_multipliers']==[.95,1.05]

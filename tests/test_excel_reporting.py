@@ -68,7 +68,8 @@ def test_datasheet_and_accepted_observation_exports_keep_their_origin():
     archive, _ = workbook_files(result_workbook(datasheet, 'Projection fiche matériau'))
     shared = archive.read('xl/sharedStrings.xml').decode('utf-8')
     assert '120 mois' in shared
-    assert 'ESTIMATION DOCUMENTAIRE DE PRÉSÉLECTION' in shared
+    assert 'NON QUALIFIÉ · DONNÉES DE VIEILLISSEMENT ABSENTES' in shared
+    assert "Décision d'usage" in shared
 
     informed = estimate_from_datasheet(material, 1100, 23, 50, 2, 2, 80, 'outdoor',
                                        material_db.evidence_rows('PP', 'outdoor'))

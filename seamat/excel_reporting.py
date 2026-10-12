@@ -238,6 +238,10 @@ def result_workbook(result: dict, title: str = "Résultat SeaMat") -> bytes:
     row += 5
     row = _section(summary, fmt, row, "Statut et lecture du résultat", end_col=9)
     row = _write_pair(summary, fmt, row, "Statut", status, end_col=9, value_format=fmt["status"])
+    reliability=manifest.get("reliability") or {}
+    if reliability:
+        row = _write_pair(summary, fmt, row, "Qualification", reliability.get("label", "Non évaluée"), end_col=9, value_format=fmt["status"])
+        row = _write_pair(summary, fmt, row, "Décision d'usage", reliability.get("decision", "Non évaluée"), end_col=9)
     row = _write_pair(summary, fmt, row, "Modèle", manifest.get("model", "Non renseigné"), end_col=9)
     row = _write_pair(summary, fmt, row, "Moteur de calcul", manifest.get("engine_version", "Non renseigné"), end_col=9)
     row = _write_pair(summary, fmt, row, "Empreinte du calcul", result.get("fingerprint", "Non renseigné"), end_col=9)
@@ -300,7 +304,7 @@ def result_workbook(result: dict, title: str = "Résultat SeaMat") -> bytes:
     chart.set_chartarea({"border": {"none": True}, "fill": {"color": "#FFFFFF"}})
     chart.set_plotarea({"border": {"color": "#DCE3EF"}, "fill": {"color": "#FFFFFF"}})
     chart.set_size({"width": 760, "height": 410})
-    summary.insert_chart("A16", chart)
+    summary.insert_chart(row + 2, 0, chart)
 
     _write_title(details, fmt, "Origine et méthode", "Les informations qui permettent de comprendre et de reproduire l'export")
     details.set_column("A:A", 34)
@@ -353,6 +357,13 @@ def result_workbook(result: dict, title: str = "Résultat SeaMat") -> bytes:
             value_format=fmt["warning"] if check["status"] != "bon" else fmt["value"],
         )
     row = _write_pair(details, fmt, row, "Expérience recommandée", diagnostic["recommended_experiment"])
+    reliability=manifest.get("reliability") or {}
+    if reliability:
+        row += 1
+        row = _section(details, fmt, row, "Qualification universelle", teal=reliability.get("tone")=="teal")
+        row = _write_pair(details, fmt, row, "Décision", reliability.get("label", "Non évaluée"), value_format=fmt["status"])
+        row = _write_pair(details, fmt, row, "Usage autorisé", reliability.get("scope", "Non renseigné"))
+        row = _write_pair(details, fmt, row, "Version de la porte", reliability.get("gate_version", "Non renseignée"))
     row += 1
     row = _section(details, fmt, row, "Budget d'incertitude")
     for item in diagnostic["uncertainty_budget"]:

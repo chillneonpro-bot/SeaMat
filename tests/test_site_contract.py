@@ -29,6 +29,7 @@ def test_material_api_is_case_insensitive():
 def test_health_uses_the_package_version():
     assert main.health()['version'] == __version__
     assert main.health()['engine_version'] == ENGINE_VERSION
+    assert main.health()['reliability_gate']
 
 
 def test_v2_benchmark_exposes_reproducible_real_evidence_cases():
@@ -42,3 +43,11 @@ def test_v2_benchmark_exposes_reproducible_real_evidence_cases():
     assert (report['iir_transfer_90c_24h']['prediction_half_width_pct']>
             report['iir_exact_100c_24h']['prediction_half_width_pct'])
     assert 'INSUFFISANTE' in report['iir_transfer_90c_24h']['status']
+
+
+def test_v2_coverage_reports_every_material_without_inventing_validation():
+    report=main.v2_coverage_api()
+    assert report['materials']==75
+    assert sum(report['counts'].values())==75
+    assert report['counts']['benchmark_ready']>=1
+    assert main.v2_material_coverage_api('pp')['material_id']=='PP'

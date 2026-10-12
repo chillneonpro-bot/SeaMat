@@ -409,9 +409,11 @@ def uncertainty_budget(result: dict) -> list[dict]:
     else:
         rows.append({'component':'Mesure / éprouvettes','value':'Non quantifiée','quantified':False,
                      'meaning':'Aucune répétition compatible n’est disponible pour ce résultat.'})
+    standardized=uncertainty.get('kind')=='standardized_rate_sensitivity'
     rows.append({'component':'Plage affichée à l’horizon','value':f'± {shown:.1f} % autour de la courbe centrale' if shown is not None else 'Non calculable',
-                 'quantified':shown is not None,
-                 'meaning':'Plage totale de 10 % : convention commune ×0,95–×1,05 sur la vitesse ; largeur en module variable avec le temps.'})
+                 'quantified':shown is not None and not standardized,
+                 'meaning':('Convention de sensibilité non statistique ; elle ne constitue pas une incertitude prédictive.'
+                            if standardized else uncertainty.get('interpretation','Bande liée aux données et à la validation disponibles.'))})
     if model.startswith('datasheet-screening-'):
         assumptions=manifest.get('assumptions',{}); multiple=assumptions.get('extrapolation_multiple')
         rows.append({'component':'Extrapolation temporelle','value':f'× {multiple:.1f} la durée observée' if _finite(multiple) else 'Non quantifiée',
@@ -450,6 +452,7 @@ def validity_diagnostic(result: dict) -> dict:
         conclusion='Interpolation utilisable pour l’enseignement dans le domaine observé.' if accepted else 'Ce résultat ne peut pas servir de preuve.'
         recommendation='Ajouter une campagne indépendante et les données brutes par éprouvette.'
     elif model.startswith('datasheet-screening-'):
+        reliability=manifest.get('reliability') or {}
         calibrated=manifest.get('evidence_level') in {'externally_validated_short_term','case_calibrated_short_term','calibrated_short_term','evidence_informed_short_term'}
         multiple=(manifest.get('assumptions') or {}).get('extrapolation_multiple')
         if calibrated and _finite(multiple):
@@ -469,6 +472,14 @@ def validity_diagnostic(result: dict) -> dict:
         conclusion=('Le calcul prolonge un profil documentaire ; la confiance diminue hors de la fenêtre publiée.' if calibrated else
                     'Le calcul fournit une estimation centrale utilisable en présélection, avec une confiance limitée par le transfert de famille.')
         recommendation='Mesurer E(t) sur le grade exact à 0, 25, 50, 75 et 100 % de l’horizon visé, avec au moins cinq éprouvettes par temps.'
+        if reliability:
+            level=reliability.get('label',level); conclusion=reliability.get('decision',conclusion)
+            checks.insert(0,{
+                'criterion':'Porte de fiabilité universelle',
+                'status':'bon' if reliability.get('usable_for_screening') else 'bloquant',
+                'finding':reliability.get('scope','Usage non renseigné.'),
+            })
+            recommendation=' '.join(reliability.get('next_actions') or [recommendation])
     else:
         checks=[{'criterion':'Nature du cas','status':'bloquant','finding':'Paramètres synthétiques sans matériau réel.'}]
         level='Démonstration synthétique'; conclusion='Ce résultat sert uniquement à apprendre le fonctionnement du modèle.'

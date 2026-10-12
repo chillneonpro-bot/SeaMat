@@ -16,10 +16,14 @@ def markdown_report(result: dict, title: str = 'Rapport SeaMat') -> bytes:
     title=_clean(title)[:200]; status=_clean(manifest.get('status','Statut inconnu'))
     display=inputs.get('horizon_display',{}) if model.startswith('datasheet-screening-') else {}
     unit={'days':'jours','months':'mois','years':'années'}.get(display.get('unit'),'années' if model.startswith('datasheet-screening-') else 'jours')
+    reliability=manifest.get('reliability') or {}
     lines=[f'# {title}','',f'**Généré le :** {datetime.now(timezone.utc).isoformat()}',
            f'**Modèle :** `{model}`',
            f'**Moteur :** `{_clean(manifest.get("engine_version", "Non renseigné"))}`',
-           f'**Statut :** {status}',f'**Empreinte :** `{_clean(result.get("fingerprint"))}`','']
+           f'**Statut :** {status}',
+           f'**Qualification :** {_clean(reliability.get("label","Non évaluée"))}',
+           f'**Décision :** {_clean(reliability.get("decision","Non évaluée"))}',
+           f'**Empreinte :** `{_clean(result.get("fingerprint"))}`','']
     if model.startswith('datasheet-screening-'):
         assessment=evidence_assessment(result)
         crossing=result.get('crossing_estimate_years'); lo,hi=result.get('crossing_interval',[None,None])

@@ -2,13 +2,15 @@
 
 **Python 3.11–3.13 · Windows · macOS · Linux · Docker**
 
-Version actuelle : **2.1.0**. SeaMat est la nouvelle branche de développement scientifique issue de Materia 0.46. Elle possède son propre code, sa propre base SQLite, ses propres secrets et son propre port. Materia reste disponible sur le port 8087 ; SeaMat utilise le port 8088 et les deux logiciels peuvent fonctionner simultanément.
+Version actuelle : **2.2.0**. SeaMat est la nouvelle branche de développement scientifique issue de Materia 0.46. Elle possède son propre code, sa propre base SQLite, ses propres secrets et son propre port. Materia reste disponible sur le port 8087 ; SeaMat utilise le port 8088 et les deux logiciels peuvent fonctionner simultanément.
 
 SeaMat conserve le catalogue, les simulations, les comparaisons, les exports, l'espace classe et les validations existantes. Le moteur V2 et ses dix contrôles sont décrits dans [l'architecture scientifique](docs/ARCHITECTURE_SCIENTIFIQUE_V2.md) et leurs résultats chiffrés dans [la validation du moteur V2.1](docs/VALIDATION_MOTEUR_V2.1.md). Voir aussi [l'installation complète](docs/INSTALLATION.md) et [la comparaison aux essais réels](docs/COMPARAISON_ESSAIS_REELS_V0.46.md).
 
 Application Python de découverte et d'exploration du vieillissement des polymères. Interface NiceGUI, graphiques Plotly, calcul NumPy/SciPy et persistance SQLite.
 
 **État : moteur V2 fonctionnel pour l’exploration, la comparaison et un pilote de classe.** Lorsqu’un corpus compatible existe, SeaMat reproduit les points publiés par interpolation PCHIP, sélectionne une loi de prolongement parmi plusieurs modèles, masque des séries entières pour mesurer l’erreur et calibre une bande prédictive sur ces erreurs. Sans données temporelles compatibles, le logiciel conserve une estimation documentaire de famille et l’identifie clairement comme telle.
+
+Depuis la version 2.2, une [porte de fiabilité universelle](docs/PLAN_FIABILITE_UNIVERSELLE.md) applique les mêmes seuils à tous les matériaux. Une fiche sans cinétique acceptée reste calculable comme scénario pédagogique, mais aucune durée issue de cette courbe n'est présentée comme exploitable. La couverture réelle des 75 matériaux est disponible par `/api/v2/coverage`.
 
 ## Ouvrir SeaMat
 

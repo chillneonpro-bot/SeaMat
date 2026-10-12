@@ -29,6 +29,7 @@ from seamat.readiness import comparison_assessment, preparation_assessment
 from seamat.planning import experiment_plan, experiment_plan_workbook
 from seamat.engine_v2 import (ENGINE_VERSION, Request, capability_summary,
                               predict_from_evidence)
+from seamat.reliability import GATE_VERSION, material_coverage
 import plotly.graph_objects as go
 
 ROOT=Path(__file__).parent
@@ -495,7 +496,13 @@ def datasheet_simulator(material: str | None=None):
                         assumptions=result['manifest']['assumptions']
                         with output:
                             ui.separator()
-                            ui.label('Votre estimation').classes('section-title')
+                            reliability=result['manifest'].get('reliability') or {}
+                            with ui.row().classes('w-full items-center justify-between gap-3'):
+                                ui.label('Votre estimation').classes('section-title')
+                                pill(reliability.get('label','Fiabilité non évaluée'),
+                                     'pill-teal' if reliability.get('tone')=='teal' else 'pill-amber')
+                            ui.label(reliability.get('decision','')).classes(
+                                'pill pill-teal w-full' if reliability.get('tone')=='teal' else 'note w-full')
                             source_uncertainty=result['manifest']['uncertainty'].get('source_specific') or {}
                             match=assumptions.get('documentary_match') or {'score':0,'label':'Non renseigné'}
                             scientific_uncertainty_kind=source_uncertainty.get('kind')
@@ -506,7 +513,8 @@ def datasheet_simulator(material: str | None=None):
                                            else 'Non borné dans le domaine calculé')
                             interval_detail=result['manifest']['uncertainty'].get('label','Plage du modèle')
                             result_cards=[
-                                ('Temps estimé pour atteindre le seuil',central_text,f"Seuil choisi : {threshold.value:g} %"),
+                                (('Temps estimé pour atteindre le seuil' if reliability.get('usable_for_screening')
+                                  else 'Scénario central non qualifié'),central_text,f"Seuil choisi : {threshold.value:g} %"),
                                 ('Plage estimée',interval_text,interval_detail),
                                 (f'Module à {horizon_text}',f"{number_fr(result['modulus'][-1])} MPa",f"{number_fr(result['retention'][-1],1)} % conservés"),
                             ]
@@ -529,10 +537,13 @@ def datasheet_simulator(material: str | None=None):
                             if band_mode:
                                 band_mode.on_value_change(lambda:result_chart.refresh())
                             result_chart()
-                            ui.label(
-                                f"Estimation à retenir : {central_text} pour atteindre {threshold.value:g} %. "
-                                f"La plage raisonnable est {interval_text}."
-                            ).classes('result-summary w-full')
+                            summary_text=(
+                                f"Valeur de présélection dans le domaine couvert : {central_text} pour atteindre {threshold.value:g} %. "
+                                f"Bande associée : {interval_text}."
+                                if reliability.get('usable_for_screening') else
+                                "Aucune durée de vie exploitable n’est disponible pour ce cas. La courbe reste un scénario de recherche à confronter à des données compatibles."
+                            )
+                            ui.label(summary_text).classes('result-summary w-full')
                             with ui.expansion('Détails et méthode',icon='info_outline').classes('w-full'):
                                 details_mount=ui.column().classes('w-full gap-3 p-3')
                             with ui.expansion('Afficher les valeurs de la courbe',icon='table_chart').classes('w-full') as curve_values_panel:
@@ -1158,6 +1169,7 @@ def compare():
 def validity_page():
     rows=material_db.evidence_rows('PP','outdoor')
     v2_controls=capability_summary(rows)
+    coverage_report=v2_coverage_api()
     literature_report=pp_literature_only_benchmark(rows)
     report=pp_temporal_holdout(rows)
     iir_rows=material_db.evidence_rows('IIR','immersion')
@@ -1173,6 +1185,22 @@ def validity_page():
         with ui.expansion('Moteur SeaMat V2 · 10 contrôles actifs',icon='memory').classes('w-full mt-5'):
             ui.label(f"Version {v2_controls['engine_version']} · chaque résultat conserve le routage, le modèle, la validation et l’empreinte du calcul.").classes('body-copy p-3 pb-0')
             table_rows(v2_controls['controls'],['id','name','status'])
+        with ui.expansion('Couverture des 75 matériaux',icon='fact_check').classes('w-full mt-3'):
+            counts=coverage_report['counts']
+            with ui.element('div').classes('result-grid w-full p-3'):
+                for label,value,detail in [
+                    ('Prêts pour benchmark',str(counts['benchmark_ready']),'Corpus suffisant pour tenter une validation'),
+                    ('Corpus limités',str(counts['evidence_limited']),'Mesures présentes mais indépendance insuffisante'),
+                    ('Documentaires',str(counts['documentary_only']),'Aucune cinétique qualifiable'),
+                ]:
+                    with ui.column().classes('result-stat gap-1'):
+                        ui.label(label).classes('stat-label'); ui.label(value).classes('result-value'); ui.label(detail).classes('small')
+            coverage_rows=[{'material_id':item['material_id'],'material_name':item['material_name'],
+                            'status':item['coverage_label'],'points':item['rows'],
+                            'experiments':item['experiments'],'sources':item['sources']}
+                           for item in coverage_report['items']]
+            table_rows(coverage_rows,['material_id','material_name','status','points','experiments','sources'])
+            ui.label('Aucun matériau n’est encore qualifié sur une source externe gelée. SeaMat bloque donc toute revendication de fiabilité universelle et publie le manque de données matériau par matériau.').classes('note w-full m-3')
         with ui.element('div').classes('result-grid w-full mt-5'):
             for label,value,detail in [
                 ('Erreur absolue moyenne',f"{number_fr(literature_report['mae_mpa'],1)} MPa",'Prédictions à 30 et 120 jours'),
@@ -2060,7 +2088,7 @@ def document_library():
         render(owner(),download_json)
 
 @app.get('/health')
-def health(): return {'status':'ok','version':__version__,'engine_version':ENGINE_VERSION,
+def health(): return {'status':'ok','version':__version__,'engine_version':ENGINE_VERSION,'reliability_gate':GATE_VERSION,
                       'scientific_validation':False,'review_protection':reviewer_configured(),'local_accounts':True}
 
 @app.get('/health/readiness')
@@ -2098,6 +2126,21 @@ def v2_capabilities_api(material_id: str):
         raise HTTPException(status_code=404,detail={'error':'Matériau inconnu','material_id':material_id})
     rows=material_db.model_evidence_rows(item['id'])
     return {'material_id':item['id'],'material_name':item['name'],**capability_summary(rows)}
+
+@app.get('/api/v2/coverage')
+def v2_coverage_api():
+    items=[material_coverage(item,material_db.model_evidence_rows(item['id']))
+           for item in material_db.catalog()]
+    counts={code:sum(row['coverage_code']==code for row in items)
+            for code in ('benchmark_ready','evidence_limited','documentary_only')}
+    return {'gate_version':GATE_VERSION,'materials':len(items),'counts':counts,'items':items}
+
+@app.get('/api/v2/coverage/{material_id}')
+def v2_material_coverage_api(material_id: str):
+    item=material_db.material(material_id.upper())
+    if not item:
+        raise HTTPException(status_code=404,detail={'error':'Matériau inconnu','material_id':material_id})
+    return material_coverage(item,material_db.model_evidence_rows(item['id']))
 
 def _v2_benchmark_case(material_id: str, temperature_c: float, horizon_days: float,
                        exposure: str, immersion_medium: str | None = None) -> dict:

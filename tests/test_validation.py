@@ -84,6 +84,6 @@ def test_validity_distinguishes_published_and_exploratory_results():
     material=material_db.material('PEEK'); profile=standard_profile(material)
     exploratory=estimate_from_datasheet(material,profile['suggested_modulus_mpa'],23,50,2,5,80)
     diagnostic=validity_diagnostic(exploratory)
-    assert diagnostic['level']=='Estimation de présélection'
-    assert all(check['status']!='bloquant' for check in diagnostic['checks'])
-    assert 'estimation centrale utilisable' in diagnostic['conclusion']
+    assert diagnostic['level']=='Non qualifié · données de vieillissement absentes'
+    assert any(check['status']=='bloquant' for check in diagnostic['checks'])
+    assert 'Aucune durée de vie exploitable' in diagnostic['conclusion']

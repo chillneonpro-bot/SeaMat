@@ -381,7 +381,8 @@ def estimate_from_datasheet(material: dict, modulus_mpa: float, temperature_c: f
             process_state=(process_state or '').strip() or None,
         ),compatible_rows)
         if routed is not None:
-            return routed
+            from seamat.reliability import apply_reliability_gate
+            return apply_reliability_gate(routed)
     if exposure=='outdoor':
         # PP has one homogeneous, directly tabulated case with four related
         # formulations. Prefer its held-out formulation benchmark to a broad
@@ -616,11 +617,25 @@ def estimate_from_datasheet(material: dict, modulus_mpa: float, temperature_c: f
             'crossing_estimate_years':crossing,'crossing_interval':[low_cross,high_cross],
             'fraction_crossing':float(crossing is not None and crossing<=horizon_years),'rate':rate,'manifest':manifest,
             'fingerprint':fingerprint,'pending':False}
-    return result
+    from seamat.reliability import apply_reliability_gate
+    return apply_reliability_gate(result)
 
 def evidence_assessment(result: dict) -> dict:
     """Return a student-readable assessment without inventing a precision score."""
     manifest=result.get('manifest',{})
+    reliability=manifest.get('reliability') or {}
+    if reliability:
+        code=reliability.get('code')
+        level=('Niveau 3 sur 4' if code=='externally_supported' else
+               'Niveau 2 sur 4' if code in {'internally_supported','published_exact_unvalidated'} else
+               'Niveau 1 sur 4')
+        return {
+            'level':level,'label':reliability.get('label','Statut non renseigné'),
+            'tone':'teal' if reliability.get('tone')=='teal' else 'amber',
+            'meaning':reliability.get('decision',''),
+            'allowed':reliability.get('scope',''),
+            'next_step':' '.join(reliability.get('next_actions') or []),
+        }
     level=manifest.get('evidence_level')
     if level in {'externally_validated_short_term','case_calibrated_short_term','calibrated_short_term','evidence_informed_short_term'}:
         multiple=(manifest.get('assumptions') or {}).get('extrapolation_multiple')
