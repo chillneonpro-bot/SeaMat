@@ -75,7 +75,7 @@ def test_datasheet_and_accepted_observation_exports_keep_their_origin():
                                        material_db.evidence_rows('PP', 'outdoor'))
     archive, _ = workbook_files(result_workbook(informed, 'Projection PP documentée'))
     shared = archive.read('xl/sharedStrings.xml').decode('utf-8')
-    assert 'Bande prédictive 90 % calibrée' in shared
+    assert 'Bande prédictive 95 % calibrée' in shared
     assert 'Minimum observé du corpus (MPa)' not in shared
     assert 'Maximum observé du corpus (MPa)' not in shared
 

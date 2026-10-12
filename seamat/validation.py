@@ -37,7 +37,7 @@ def _error_metrics(details: list[dict]) -> dict:
     }
 
 
-def _finite_sample_band(details: list[dict], target_coverage: float = .8) -> dict:
+def _finite_sample_band(details: list[dict], target_coverage: float = .95) -> dict:
     """Return an auditable split-conformal absolute relative-error band."""
     residuals=np.sort(np.asarray([row['relative_error_pct'] for row in details],dtype=float))
     if not len(residuals):

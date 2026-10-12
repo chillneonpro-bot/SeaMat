@@ -64,7 +64,7 @@ Les 21 valeurs viennent du tableau 2 de l’article, colonne `E exp`, en présen
 | 120 °C | 6 h | 3,41 | 3,24 | 5,04 % |
 | 120 °C | 14 h | 3,15 | 3,25 | 3,32 % |
 
-Indicateurs temporels : MAE 0,321 MPa, RMSE 0,588 MPa, MAPE 8,35 %, R² 0,810. Treize points sur quinze sont compris dans la bande interne ±14,65 %. Le pic puis la chute à 120 °C rendent l’interpolation à 4 h impropre.
+Indicateurs temporels : MAE 0,321 MPa, RMSE 0,588 MPa, MAPE 8,35 %, R² 0,810. La bande à couverture cible 95 % vaut ±51,38 % sur ce petit corpus : elle couvre les quinze points, mais elle est trop large pour être utile. Le pic puis la chute à 120 °C rendent l’interpolation à 4 h impropre.
 
 Le second contrôle masque toute la courbe à 100 °C et la reconstruit avec 80 et 120 °C. Il produit 11,31 % d’erreur moyenne, 28,76 % au maximum et un R² de -2,154. SeaMat utilise donc les courbes exactes à 80, 100 ou 120 °C et avertit l’utilisateur pour une température intermédiaire.
 

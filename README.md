@@ -2,9 +2,9 @@
 
 **Python 3.11–3.13 · Windows · macOS · Linux · Docker**
 
-Version actuelle : **2.3.0**. SeaMat est la nouvelle branche de développement scientifique issue de Materia 0.46. Elle possède son propre code, sa propre base SQLite, ses propres secrets et son propre port. Materia reste disponible sur le port 8087 ; SeaMat utilise le port 8088 et les deux logiciels peuvent fonctionner simultanément.
+Version actuelle : **2.4.0**. SeaMat est la nouvelle branche de développement scientifique issue de Materia 0.46. Elle possède son propre code, sa propre base SQLite, ses propres secrets et son propre port. Materia reste disponible sur le port 8087 ; SeaMat utilise le port 8088 et les deux logiciels peuvent fonctionner simultanément.
 
-SeaMat conserve le catalogue, les simulations, les comparaisons, les exports, l'espace classe et les validations existantes. Le moteur V2 et ses dix contrôles sont décrits dans [l'architecture scientifique](docs/ARCHITECTURE_SCIENTIFIQUE_V2.md) et leurs résultats chiffrés dans [la validation du moteur V2.1](docs/VALIDATION_MOTEUR_V2.1.md). Voir aussi [l'installation complète](docs/INSTALLATION.md) et [la comparaison aux essais réels](docs/COMPARAISON_ESSAIS_REELS_V0.46.md).
+SeaMat conserve le catalogue, les simulations, les comparaisons, les exports, l'espace classe et les validations existantes. Le moteur V2 et ses dix contrôles sont décrits dans [l'architecture scientifique](docs/ARCHITECTURE_SCIENTIFIQUE_V2.md) et leurs résultats chiffrés dans [la validation du moteur V2.1](docs/VALIDATION_MOTEUR_V2.1.md). Voir aussi [l'installation complète](docs/INSTALLATION.md), [la comparaison aux essais réels](docs/COMPARAISON_ESSAIS_REELS_V0.46.md) et [la qualification statistique 95/95](docs/VALIDATION_95.md).
 
 Application Python de découverte et d'exploration du vieillissement des polymères. Interface NiceGUI, graphiques Plotly, calcul NumPy/SciPy et persistance SQLite.
 
@@ -13,6 +13,8 @@ Application Python de découverte et d'exploration du vieillissement des polymè
 Depuis la version 2.2, une [porte de fiabilité universelle](docs/PLAN_FIABILITE_UNIVERSELLE.md) applique les mêmes seuils à tous les matériaux. Une fiche sans cinétique acceptée reste calculable comme scénario pédagogique, mais aucune durée issue de cette courbe n'est présentée comme exploitable. La couverture réelle des 75 matériaux est disponible par `/api/v2/coverage`.
 
 Depuis la version 2.3, un matériau ajouté manuellement peut utiliser une cinétique d’analogue documenté sans disposer de ses propres essais. Le calcul exige une correspondance d’au moins 85/100 sur la famille, le polymère de base, les mécanismes, le module, le procédé, le renfort et le milieu. Il reste limité à la fenêtre publiée de l’analogue et sa bande inclut une pénalité de transfert. Les règles sont décrites dans [l’ajout manuel par analogues](docs/AJOUT_MANUEL_ANALOGUES.md).
+
+Depuis la version 2.4, chaque résultat affiche aussi l’audit **95/95** : SeaMat ne déclare une couverture de 95 % démontrée que si sa borne binomiale unilatérale à 95 % atteint elle-même 95 %, sur des groupes entièrement masqués et au moins deux sources indépendantes. Les points temporels corrélés d’une même formulation ne gonflent plus artificiellement la taille de validation.
 
 ## Ouvrir SeaMat
 

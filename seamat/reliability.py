@@ -10,15 +10,18 @@ from dataclasses import dataclass, asdict
 from hashlib import sha256
 import json
 from typing import Any
+from scipy.stats import beta
 
 
-GATE_VERSION = "seamat-reliability-gate-1.0.0"
+GATE_VERSION = "seamat-reliability-gate-1.1.0"
 MIN_HIDDEN_PREDICTIONS = 6
 MAX_MAPE_PCT = 10.0
 MAX_APE_PCT = 20.0
 MIN_COVERAGE_PCT = 80.0
 MAX_COVERAGE_PCT = 100.0
 MIN_EXTERNAL_SOURCES = 2
+TARGET_RELIABILITY_PCT = 95.0
+TARGET_CONFIDENCE_PCT = 95.0
 
 
 @dataclass(frozen=True)
@@ -63,6 +66,48 @@ def _criteria(validation: dict) -> dict:
     }
 
 
+def _coverage_95_claim(validation: dict, sources: int) -> dict:
+    """One-sided exact binomial audit for a 95 % coverage claim.
+
+    Whole hidden formulations/temperatures are the statistical units whenever
+    the engine exposes them.  A group passes only if all its hidden points are
+    covered, preventing many correlated time points from inflating confidence.
+    """
+    point_count=int(validation.get("test_predictions") or 0)
+    groups=int(validation.get("independent_validation_groups") or 0)
+    covered_groups=int(validation.get("covered_validation_groups") or 0)
+    if groups<=0:
+        coverage=_number(validation.get("empirical_point_coverage_pct"))
+        groups=point_count
+        covered_groups=(int(round(groups*(coverage or 0)/100)) if coverage is not None else 0)
+    if groups<=0 or covered_groups<=0:
+        lower=0.
+    else:
+        lower=float(beta.ppf(1-TARGET_CONFIDENCE_PCT/100,covered_groups,groups-covered_groups+1)*100)
+    # Best-case number of additional fully covered, independent groups needed
+    # from the current result. This is 59 total groups when there are no misses.
+    required_total=None
+    for total in range(groups,10001):
+        successes=covered_groups+(total-groups)
+        bound=(float(beta.ppf(.05,successes,total-successes+1)*100) if successes else 0.)
+        if bound>=TARGET_RELIABILITY_PCT:
+            required_total=total; break
+    qualified=bool(lower>=TARGET_RELIABILITY_PCT and sources>=MIN_EXTERNAL_SOURCES)
+    return {
+        "target_coverage_pct":TARGET_RELIABILITY_PCT,
+        "confidence_level_pct":TARGET_CONFIDENCE_PCT,
+        "validation_unit":"groupe indépendant entièrement masqué",
+        "independent_groups":groups,"covered_groups":covered_groups,
+        "observed_group_coverage_pct":float(covered_groups/groups*100) if groups else None,
+        "one_sided_lower_bound_pct":lower,
+        "minimum_external_sources":MIN_EXTERNAL_SOURCES,"observed_sources":sources,
+        "required_total_groups_best_case":required_total,
+        "additional_groups_best_case":(required_total-groups if required_total is not None else None),
+        "qualified":qualified,
+        "decision":("Objectif 95/95 démontré dans le domaine testé."
+                    if qualified else
+                    "Objectif 95/95 non démontré : la précision observée ne suffit pas sans assez de groupes externes."),
+    }
 def assess_result(result: dict) -> dict:
     """Classify a result with one rule set shared by every material."""
     manifest=result.get("manifest") or {}
@@ -74,6 +119,7 @@ def assess_result(result: dict) -> dict:
     in_time_domain=multiple is not None and multiple<=1.0+1e-9
     route=str(assumptions.get("profile_method") or "documentary_family")
     sources=int(assumptions.get("independent_sources") or 0)
+    claim_95=_coverage_95_claim(validation,sources)
     match=(assumptions.get("documentary_match") or {})
     match_score=int(match.get("score") or 0)
     engine_backed=model=="datasheet-screening-v6-seamat-engine"
@@ -163,7 +209,7 @@ def assess_result(result: dict) -> dict:
             reasons=["critères échoués : "+", ".join(failed)],
             next_actions=["ajouter des groupes indépendants","revoir la route ou le mécanisme physique"],
         )
-    elif sources>=MIN_EXTERNAL_SOURCES and match_score>=80:
+    elif claim_95["qualified"] and match_score>=80:
         decision=ReliabilityDecision(
             code="externally_supported",label="Fiabilité démontrée dans le domaine publié",tone="teal",
             usable_for_screening=True,qualified_external=True,
@@ -187,7 +233,8 @@ def assess_result(result: dict) -> dict:
     payload.update({"gate_version":GATE_VERSION,"criteria":criteria,
                     "route":route,"match_score":match_score,"source_count":sources,
                     "within_published_time":in_time_domain,
-                    "analog_score":int(analog.get("similarity_score") or 0) if analog else None})
+                    "analog_score":int(analog.get("similarity_score") or 0) if analog else None,
+                    "reliability_95":claim_95})
     return payload
 
 
@@ -197,6 +244,7 @@ def apply_reliability_gate(result: dict) -> dict:
     assessment=assess_result(result)
     assessment["model_status"]=original
     manifest["reliability"]=assessment
+    manifest["reliability_95"]=assessment["reliability_95"]
     manifest["status"]=assessment["label"].upper()
     uncertainty=manifest.get("uncertainty") or {}
     uncertainty["qualified_for_use"]=bool(assessment["usable_for_screening"])

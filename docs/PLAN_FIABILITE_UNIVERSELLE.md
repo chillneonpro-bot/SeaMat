@@ -90,4 +90,4 @@ Ajouter les nouvelles campagnes comme tests externes avant de les incorporer à 
 
 ## Critère de fin
 
-SeaMat pourra être déclaré fiable pour un matériau précis lorsque sa source externe gelée respecte MAPE ≤ 10 %, erreur maximale ≤ 20 %, biais absolu ≤ 5 % et couverture 80–95 % pour une cible de 90 %, dans le domaine annoncé. L'application entière ne sera dite « universelle » que lorsque chaque matériau du catalogue aura atteint ce niveau ; jusque-là, la couverture est publiée matériau par matériau.
+SeaMat pourra être déclaré fiable pour un domaine matériau précis lorsque sa source externe gelée respecte MAPE ≤ 10 %, erreur maximale ≤ 20 %, et l'objectif 95/95 : au moins 95 % de groupes entièrement masqués couverts avec une borne binomiale unilatérale à 95 % atteignant elle-même 95 %. Même sans aucun échec, cela exige 59 groupes indépendants et au moins deux sources. L'application entière ne sera dite « universelle » que lorsque chaque domaine revendiqué aura atteint ce niveau ; jusque-là, la couverture est publiée matériau par matériau. Le protocole chiffré est détaillé dans `VALIDATION_95.md`.

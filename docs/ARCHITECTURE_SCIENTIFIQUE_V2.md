@@ -56,7 +56,7 @@ La plage prédictive doit combiner :
 - pénalité de transfert entre grades, protocoles ou environnements ;
 - pénalité d'extrapolation temporelle.
 
-La vue principale affiche la valeur centrale, la borne prudente et le niveau de confiance. La plage ±5 % reste une convention visuelle seulement tant qu'une couverture statistique de 80 ou 90 % n'est pas démontrée.
+La vue principale affiche la valeur centrale, la borne prudente et le niveau de confiance. Une plage visuelle fixe reste une convention tant que la qualification 95/95 n'est pas démontrée sur des groupes indépendants ; elle ne doit jamais être présentée comme un intervalle prédictif validé.
 
 ## Validation obligatoire
 

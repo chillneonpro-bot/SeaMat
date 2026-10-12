@@ -55,7 +55,8 @@ def test_iir_masked_interpolation_and_temperature_transfer_are_separated():
     temperature=iir_temperature_holdout(rows)
     assert temporal['test_count']==15
     assert temporal['mape_pct']==pytest.approx(8.3512505078)
-    assert temporal['empirical_half_width_pct']==pytest.approx(14.6496815287)
+    assert temporal['target_coverage_pct']==95
+    assert temporal['empirical_half_width_pct']==pytest.approx(51.3803680982)
     assert temporal['max_relative_error_pct']==pytest.approx(51.3803680982)
     assert temperature['test_count']==6
     assert temperature['mape_pct']==pytest.approx(11.3127887737)

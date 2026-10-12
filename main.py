@@ -29,7 +29,7 @@ from seamat.readiness import comparison_assessment, preparation_assessment
 from seamat.planning import experiment_plan, experiment_plan_workbook
 from seamat.engine_v2 import (ENGINE_VERSION, Request, capability_summary,
                               predict_from_evidence)
-from seamat.reliability import GATE_VERSION, material_coverage
+from seamat.reliability import GATE_VERSION, material_coverage, apply_reliability_gate
 from seamat.analog_model import rank_analogs, MIN_ANALOG_SCORE
 import plotly.graph_objects as go
 
@@ -588,6 +588,13 @@ def datasheet_simulator(material: str | None=None):
                                          f"seuil requis {analog_search.get('minimum_score',MIN_ANALOG_SCORE)}/100."
                                          if best else 'Aucun analogue publié compatible avec le milieu choisi.')
                                 ui.label(message).classes('note w-full')
+                            claim95=result['manifest'].get('reliability_95') or {}
+                            if claim95.get('independent_groups'):
+                                ui.label(
+                                    (f"Qualification 95/95 : {'démontrée' if claim95.get('qualified') else 'non démontrée'} · "
+                                     f"{claim95['covered_groups']}/{claim95['independent_groups']} groupes couverts · "
+                                     f"borne statistique basse {number_fr(claim95['one_sided_lower_bound_pct'],1)} %." )
+                                ).classes('pill pill-teal w-full' if claim95.get('qualified') else 'note w-full')
                             band_mode=None
                             if result.get('outer_lower'):
                                 band_mode=ui.select({
@@ -1247,11 +1254,28 @@ def validity_page():
     iir_temperature=iir_temperature_holdout(iir_rows)
     flax_report=flax_temperature_transfer_benchmark(
         material_db.observation_rows('FLAX_EPOXY',include_pending=True))
+    pp_qualification=estimate_from_datasheet(material_db.material('PP'),1500,23,50,2,
+        120/365.25,80,'outdoor',material_db.model_evidence_rows('PP','outdoor'))['manifest']['reliability_95']
     with shell('/validite','Validité scientifique'):
         intro('Contrôle scientifique','Ce que SeaMat sait vraiment prédire',
               'Cette page compare les prédictions de SeaMat aux modules réellement publiés et sépare clairement la fenêtre vérifiée de l’extrapolation.')
         with ui.row().classes('w-full justify-end'):
             button('Comparer une prédiction figée','/validation-aveugle','fact_check').props('outline')
+        with ui.column().classes('panel w-full mt-5 gap-4'):
+            with ui.row().classes('w-full justify-between items-center gap-3'):
+                ui.label('Objectif statistique 95/95').classes('section-title')
+                pill('DÉMONTRÉ' if pp_qualification['qualified'] else 'NON DÉMONTRÉ',
+                     'pill-teal' if pp_qualification['qualified'] else 'pill-amber')
+            ui.label('Cible : couvrir au moins 95 % des futurs groupes comparables, avec un niveau de confiance de 95 %. Chaque formulation ou campagne entièrement masquée compte comme une unité ; ses temps corrélés ne sont pas comptés comme des essais indépendants.').classes('body-copy')
+            with ui.element('div').classes('result-grid w-full'):
+                for label,value,detail in [
+                    ('Groupes PP couverts',f"{pp_qualification['covered_groups']} / {pp_qualification['independent_groups']}",'Quatre formulations entièrement masquées'),
+                    ('Borne basse à 95 %',f"{number_fr(pp_qualification['one_sided_lower_bound_pct'],1)} %",'Couverture minimale statistiquement défendable'),
+                    ('Validations encore requises',str(pp_qualification['additional_groups_best_case']),'Meilleur cas : aucune erreur supplémentaire'),
+                ]:
+                    with ui.column().classes('result-stat gap-1'):
+                        ui.label(label).classes('stat-label'); ui.label(value).classes('result-value'); ui.label(detail).classes('small')
+            ui.label(pp_qualification['decision']+' Une erreur moyenne faible sur quatre formulations ne permet pas encore d’affirmer une fiabilité universelle de 95 %.').classes('note w-full')
         with ui.expansion('Moteur SeaMat V2 · 10 contrôles actifs',icon='memory').classes('w-full mt-5'):
             ui.label(f"Version {v2_controls['engine_version']} · chaque résultat conserve le routage, le modèle, la validation et l’empreinte du calcul.").classes('body-copy p-3 pb-0')
             table_rows(v2_controls['controls'],['id','name','status'])
@@ -1275,7 +1299,7 @@ def validity_page():
             for label,value,detail in [
                 ('Erreur absolue moyenne',f"{number_fr(literature_report['mae_mpa'],1)} MPa",'Prédictions à 30 et 120 jours'),
                 ('Erreur relative moyenne',f"{number_fr(literature_report['mape_pct'],2)} %",f"{literature_report['test_count']} prédictions hors formulation"),
-                ('Bande empirique interne',f"± {number_fr(literature_report['empirical_half_width_pct'],1)} %",f"{number_fr(literature_report['empirical_coverage_pct'],0)} % des valeurs masquées couvertes"),
+                ('Bande interne 95 %',f"± {number_fr(literature_report['empirical_half_width_pct'],1)} %",f"{number_fr(literature_report['empirical_coverage_pct'],0)} % des valeurs masquées couvertes"),
             ]:
                 with ui.column().classes('result-stat gap-1'):
                     ui.label(label).classes('stat-label'); ui.label(value).classes('result-value'); ui.label(detail).classes('small')
@@ -1304,7 +1328,7 @@ def validity_page():
                 for label,value,detail in [
                     ('Valeurs publiées','21','Tableau 2 vérifié · 80, 100 et 120 °C'),
                     ('Erreur moyenne',f"{number_fr(iir_temporal['mape_pct'],2)} %",f"MAE {number_fr(iir_temporal['mae_mpa'],2)} MPa"),
-                    ('Bande interne 80 %',f"± {number_fr(iir_temporal['empirical_half_width_pct'],1)} %",f"Pire écart {number_fr(iir_temporal['max_relative_error_pct'],1)} %"),
+                    ('Bande interne 95 %',f"± {number_fr(iir_temporal['empirical_half_width_pct'],1)} %",f"Pire écart {number_fr(iir_temporal['max_relative_error_pct'],1)} %"),
                 ]:
                     with ui.column().classes('result-stat gap-1'):
                         ui.label(label).classes('stat-label'); ui.label(value).classes('result-value'); ui.label(detail).classes('small')
@@ -1332,7 +1356,7 @@ def validity_page():
                 for label,value,detail in [
                     ('Prédictions masquées',str(flax_report['test_count']),'Jours 1, 3, 9 et 38 · 20/40 °C'),
                     ('Erreur moyenne',f"{number_fr(flax_report['mape_pct'],2)} %",f"MAE {number_fr(flax_report['mae_mpa'],0)} MPa · R² {number_fr(flax_report['r2'],3)}"),
-                    ('Bande empirique interne',f"± {number_fr(flax_report['empirical_half_width_pct'],1)} %",f"{number_fr(flax_report['empirical_coverage_pct'],0)} % des 8 valeurs couvertes"),
+                    ('Bande interne 95 %',f"± {number_fr(flax_report['empirical_half_width_pct'],1)} %",f"{number_fr(flax_report['empirical_coverage_pct'],0)} % des 8 valeurs couvertes"),
                 ]:
                     with ui.column().classes('result-stat gap-1'):
                         ui.label(label).classes('stat-label'); ui.label(value).classes('result-value'); ui.label(detail).classes('small')
@@ -2224,6 +2248,7 @@ def _v2_benchmark_case(material_id: str, temperature_c: float, horizon_days: flo
     ),rows)
     if result is None:
         return {'material_id':material_id,'status':'corpus incompatible'}
+    result=apply_reliability_gate(result)
     assumptions=result['manifest']['assumptions']; uncertainty=result['manifest']['uncertainty']
     validation=assumptions['validation']
     return {
@@ -2236,6 +2261,7 @@ def _v2_benchmark_case(material_id: str, temperature_c: float, horizon_days: flo
         'hidden_predictions':validation['test_predictions'],
         'hidden_mape_pct':validation['mape_pct'],
         'hidden_coverage_pct':validation['empirical_point_coverage_pct'],
+        'reliability_95':result['manifest']['reliability_95'],
         'status':result['manifest']['status'],
         'engine_version':result['manifest']['engine_version'],
         'fingerprint':result['fingerprint'],

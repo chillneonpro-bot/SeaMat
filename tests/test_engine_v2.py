@@ -59,7 +59,10 @@ def test_control_7_pp_band_is_calibrated_on_hidden_formulations():
     uncertainty=result['manifest']['uncertainty']
     assert uncertainty['kind']=='calibrated_log_conformal'
     assert uncertainty['base_half_width_pct']==pytest.approx(3.4109767496)
+    assert uncertainty['target_coverage_pct']==95
     assert uncertainty['calibration']['empirical_point_coverage_pct']==100
+    assert uncertainty['calibration']['independent_validation_groups']==4
+    assert uncertainty['calibration']['covered_validation_groups']==4
 
 
 def test_control_8_validation_recovers_published_pp_error():

@@ -21,8 +21,8 @@ from scipy.optimize import OptimizeWarning
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 
-ENGINE_VERSION = "seamat-evidence-router-2.1.0"
-TARGET_COVERAGE = 0.90
+ENGINE_VERSION = "seamat-evidence-router-2.2.0"
+TARGET_COVERAGE = 0.95
 MIN_RETENTION = 1e-6
 
 
@@ -301,13 +301,22 @@ def validation_metrics(predictions: list[dict], half_width: float | None=None) -
     if not predictions:
         return {"test_predictions":0,"mae_retention":None,"rmse_retention":None,
                 "mape_pct":None,"median_ape_pct":None,"max_ape_pct":None,"r2":None,
-                "empirical_point_coverage_pct":None,"residuals":[]}
+                "empirical_point_coverage_pct":None,"independent_validation_groups":0,
+                "covered_validation_groups":0,"residuals":[]}
     observed=np.asarray([row["observed"] for row in predictions],dtype=float)
     predicted=np.asarray([row["predicted"] for row in predictions],dtype=float)
     ape=np.abs(predicted-observed)/np.maximum(np.abs(observed),MIN_RETENTION)*100
     log_residual=np.abs(np.log(np.maximum(observed,MIN_RETENTION))-
                         np.log(np.maximum(predicted,MIN_RETENTION)))
     coverage=(float(np.mean(log_residual<=half_width)*100) if half_width is not None else None)
+    group_names=sorted({str(row.get("group") or row.get("source_id") or index)
+                        for index,row in enumerate(predictions)})
+    covered_groups=0
+    if half_width is not None:
+        for group in group_names:
+            indices=[index for index,row in enumerate(predictions)
+                     if str(row.get("group") or row.get("source_id") or index)==group]
+            covered_groups+=int(bool(indices) and all(log_residual[index]<=half_width for index in indices))
     return {
         "test_predictions":len(predictions),
         "mae_retention":float(mean_absolute_error(observed,predicted)),
@@ -316,6 +325,8 @@ def validation_metrics(predictions: list[dict], half_width: float | None=None) -
         "max_ape_pct":float(np.max(ape)),
         "r2":float(r2_score(observed,predicted)) if len(predictions)>=2 else None,
         "empirical_point_coverage_pct":coverage,
+        "independent_validation_groups":len(group_names),
+        "covered_validation_groups":covered_groups,
         "residuals":[float(value) for value in log_residual],
     }
 
