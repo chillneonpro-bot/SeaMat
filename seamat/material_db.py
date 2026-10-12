@@ -12,7 +12,7 @@ SOURCES = [
     {
         "id": "nims-polyinfo",
         "title": "NIMS Polymer Database PoLyInfo",
-        "organization": "National Institute for SeaMatls Science (NIMS)",
+        "organization": "National Institute for Materials Science (NIMS)",
         "url": "https://polymer.nims.go.jp/en/",
         "doi": "10.1080/27660400.2024.2354649",
         "accessed": "2026-09-29",
@@ -62,7 +62,7 @@ SOURCES = [
     {
         "id": "nims-taxonomy",
         "title": "PoLyInfo — Taxonomy, Definitions and Rules for Classification",
-        "organization": "National Institute for SeaMatls Science (NIMS)",
+        "organization": "National Institute for Materials Science (NIMS)",
         "url": "https://polymer.nims.go.jp/PoLyInfo/guide/en/pdf/TaxonomyDefinition.pdf",
         "doi": None,
         "accessed": "2026-09-23",
@@ -92,7 +92,7 @@ SOURCES = [
     {
         "id": "mdpi-pp-opoka-aging-2022",
         "title": "The Accelerated Aging Impact on Mechanical and Thermal Properties of Polypropylene Composites with Sedimentary Rock Opoka-Hybrid Natural Filler",
-        "organization": "MDPI SeaMatls / PubMed Central",
+        "organization": "MDPI Materials / PubMed Central",
         "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8745994/",
         "doi": "10.3390/ma15010338",
         "accessed": "2026-09-29",
@@ -132,7 +132,7 @@ SOURCES = [
     {
         "id": "mdpi-pp-zno-sunlight-2020",
         "title": "Polypropylene/ZnO Nanocomposites: Mechanical Properties, Photocatalytic Dye Degradation, and Antibacterial Property",
-        "organization": "MDPI SeaMatls / PubMed Central",
+        "organization": "MDPI Materials / PubMed Central",
         "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7078909/",
         "doi": "10.3390/ma13040914",
         "accessed": "2026-09-30",
