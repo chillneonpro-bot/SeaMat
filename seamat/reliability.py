@@ -77,16 +77,63 @@ def assess_result(result: dict) -> dict:
     match=(assumptions.get("documentary_match") or {})
     match_score=int(match.get("score") or 0)
     engine_backed=model=="datasheet-screening-v6-seamat-engine"
+    analog=assumptions.get("analog_transfer") or {}
 
-    if not engine_backed:
+    if analog:
+        analog_score=int(analog.get("similarity_score") or 0)
+        analog_minimum=int(analog.get("minimum_score") or 85)
+        if not in_time_domain:
+            decision=ReliabilityDecision(
+                code="analog_extrapolation_unqualified",label="Analogue proche · hors fenêtre publiée",tone="red",
+                usable_for_screening=False,qualified_external=False,
+                decision="L’analogue est suffisamment proche, mais l’horizon dépasse les observations qui fondent le transfert.",
+                scope=f"Usage limité à {float(assumptions.get('evidence_window_days') or 0):g} jours.",
+                reasons=[f"similarité {analog_score}/100",f"horizon ×{multiple:.2f} la fenêtre observée"],
+                next_actions=["réduire l’horizon","ajouter une source analogue couvrant une durée plus longue"],
+            )
+        elif analog_score<analog_minimum or not criteria["passed"]:
+            failed=[name for name,passed in criteria["checks"].items() if not passed]
+            decision=ReliabilityDecision(
+                code="analog_unqualified",label="Analogue insuffisant · estimation non qualifiée",tone="red",
+                usable_for_screening=False,qualified_external=False,
+                decision="La proximité de l’analogue ou sa validation ne suffit pas pour rendre ce calcul exploitable.",
+                scope="Hypothèse de recherche uniquement.",
+                reasons=[f"similarité {analog_score}/100, seuil {analog_minimum}/100"]+
+                        (["critères échoués : "+", ".join(failed)] if failed else []),
+                next_actions=["compléter la formulation et le procédé","choisir un analogue documenté plus proche"],
+            )
+        else:
+            decision=ReliabilityDecision(
+                code="analog_supported_limited",label="Analogue documenté · usage limité",tone="teal",
+                usable_for_screening=True,qualified_external=False,
+                decision="La valeur centrale est exploitable pour une présélection dans la fenêtre publiée de l’analogue.",
+                scope="Comparaison et présélection de recherche ; le grade personnalisé n’est pas qualifié.",
+                reasons=[f"similarité {analog_score}/100",
+                         f"{criteria['observed']['hidden_predictions']} prédictions masquées sur l’analogue",
+                         f"transfert depuis {analog.get('source_material_name','un matériau publié')}"] ,
+                next_actions=["conserver la fiche exacte du grade","valider ultérieurement sur un jeu indépendant"],
+            )
+    elif not engine_backed:
+        analog_search=assumptions.get("analog_search") or {}
+        best_analog=analog_search.get("best") or {}
+        documentary_reasons=["aucune série temporelle compatible et acceptée","cinétique transférée depuis une famille"]
+        documentary_actions=["ajouter au moins trois séries comparables et douze points",
+                             "réserver une campagne ou une publication indépendante à la validation"]
+        if analog_search:
+            documentary_reasons=[
+                (f"meilleur analogue : {best_analog.get('material_name')} à {best_analog.get('score',0)}/100, "
+                 f"sous le seuil {analog_search.get('minimum_score',85)}/100")
+                if best_analog else "aucun analogue publié dans le milieu demandé",
+            ]+(best_analog.get("limits") or [])
+            documentary_actions=["compléter le polymère de base, la formulation, le procédé et les additifs",
+                                 "ajouter un analogue publié compatible au corpus"]
         decision=ReliabilityDecision(
             code="documentary_only",label="Non qualifié · données de vieillissement absentes",tone="red",
             usable_for_screening=False,qualified_external=False,
             decision="La courbe est un scénario documentaire. Aucune durée de vie exploitable ne doit en être déduite.",
             scope="Comparaison pédagogique des hypothèses uniquement.",
-            reasons=["aucune série temporelle compatible et acceptée","cinétique transférée depuis une famille"],
-            next_actions=["ajouter au moins trois séries comparables et douze points",
-                          "réserver une campagne ou une publication indépendante à la validation"],
+            reasons=documentary_reasons,
+            next_actions=documentary_actions,
         )
     elif not in_time_domain:
         decision=ReliabilityDecision(
@@ -139,7 +186,8 @@ def assess_result(result: dict) -> dict:
     payload=asdict(decision)
     payload.update({"gate_version":GATE_VERSION,"criteria":criteria,
                     "route":route,"match_score":match_score,"source_count":sources,
-                    "within_published_time":in_time_domain})
+                    "within_published_time":in_time_domain,
+                    "analog_score":int(analog.get("similarity_score") or 0) if analog else None})
     return payload
 
 

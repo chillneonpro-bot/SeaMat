@@ -2,7 +2,7 @@
 
 **Python 3.11–3.13 · Windows · macOS · Linux · Docker**
 
-Version actuelle : **2.2.0**. SeaMat est la nouvelle branche de développement scientifique issue de Materia 0.46. Elle possède son propre code, sa propre base SQLite, ses propres secrets et son propre port. Materia reste disponible sur le port 8087 ; SeaMat utilise le port 8088 et les deux logiciels peuvent fonctionner simultanément.
+Version actuelle : **2.3.0**. SeaMat est la nouvelle branche de développement scientifique issue de Materia 0.46. Elle possède son propre code, sa propre base SQLite, ses propres secrets et son propre port. Materia reste disponible sur le port 8087 ; SeaMat utilise le port 8088 et les deux logiciels peuvent fonctionner simultanément.
 
 SeaMat conserve le catalogue, les simulations, les comparaisons, les exports, l'espace classe et les validations existantes. Le moteur V2 et ses dix contrôles sont décrits dans [l'architecture scientifique](docs/ARCHITECTURE_SCIENTIFIQUE_V2.md) et leurs résultats chiffrés dans [la validation du moteur V2.1](docs/VALIDATION_MOTEUR_V2.1.md). Voir aussi [l'installation complète](docs/INSTALLATION.md) et [la comparaison aux essais réels](docs/COMPARAISON_ESSAIS_REELS_V0.46.md).
 
@@ -11,6 +11,8 @@ Application Python de découverte et d'exploration du vieillissement des polymè
 **État : moteur V2 fonctionnel pour l’exploration, la comparaison et un pilote de classe.** Lorsqu’un corpus compatible existe, SeaMat reproduit les points publiés par interpolation PCHIP, sélectionne une loi de prolongement parmi plusieurs modèles, masque des séries entières pour mesurer l’erreur et calibre une bande prédictive sur ces erreurs. Sans données temporelles compatibles, le logiciel conserve une estimation documentaire de famille et l’identifie clairement comme telle.
 
 Depuis la version 2.2, une [porte de fiabilité universelle](docs/PLAN_FIABILITE_UNIVERSELLE.md) applique les mêmes seuils à tous les matériaux. Une fiche sans cinétique acceptée reste calculable comme scénario pédagogique, mais aucune durée issue de cette courbe n'est présentée comme exploitable. La couverture réelle des 75 matériaux est disponible par `/api/v2/coverage`.
+
+Depuis la version 2.3, un matériau ajouté manuellement peut utiliser une cinétique d’analogue documenté sans disposer de ses propres essais. Le calcul exige une correspondance d’au moins 85/100 sur la famille, le polymère de base, les mécanismes, le module, le procédé, le renfort et le milieu. Il reste limité à la fenêtre publiée de l’analogue et sa bande inclut une pénalité de transfert. Les règles sont décrites dans [l’ajout manuel par analogues](docs/AJOUT_MANUEL_ANALOGUES.md).
 
 ## Ouvrir SeaMat
 
@@ -39,6 +41,7 @@ GitHub Pages ne peut pas exécuter cette application Python. Pour obtenir cette 
 
 - Accueil : aperçu pédagogique et accès aux fonctions.
 - Matériaux : recherche dans un catalogue réel de 75 polymères et composites.
+- Ajout manuel : description structurée du polymère, de la formulation et du procédé, classement des analogues publiés, seuil d’acceptation commun et refus explicite si la preuve est insuffisante.
 - Catalogue réel : 21 profils de module initial pour 19 matériaux sont recoupés entre deux documents fabricant officiels. Grade, norme, conditionnement, procédé et plage restent visibles.
 - Simuler : page d’orientation vers deux parcours : fiche matériau et mesures publiées.
 - Fiche matériau : estimation centrale sur les 75 fiches à partir du module initial, de la température, de l'humidité, de l'épaisseur et du milieu. Un module fabricant recoupé est proposé lorsqu’il existe ; la cinétique reste explicitement séparée. Le rapport affiche le niveau de preuve, les facteurs, les limites, une table accessible et une empreinte reproductible.
@@ -93,7 +96,7 @@ Le manifeste conserve la version de schéma, la taille et l’empreinte SHA-256 
 
 ## Limites explicites
 
-Pas encore implémentés : authentification institutionnelle, administration centralisée des comptes, réinitialisation de mot de passe, extraction IA/OCR des publications, assistant conversationnel, intervalle prédictif validé pour toutes les familles, historique environnemental variable et choix automatique d'expériences. Hors PP extérieur, le corpus reste trop petit pour calibrer une incertitude statistique par matériau. La courbe centrale générique est donc une estimation de présélection, explicitement séparée des modèles informés par plusieurs publications.
+Pas encore implémentés : authentification institutionnelle, administration centralisée des comptes, réinitialisation de mot de passe, extraction IA/OCR des publications, assistant conversationnel, intervalle prédictif validé pour toutes les familles, historique environnemental variable et choix automatique d'expériences. Hors PP extérieur, le corpus reste trop petit pour calibrer une incertitude statistique par matériau. Un transfert par analogue ne constitue jamais une qualification du grade personnalisé ; il autorise uniquement une présélection lorsque les seuils et le domaine sont satisfaits. La courbe centrale générique reste explicitement séparée des modèles informés par des publications.
 
 Les publications Crossref fournissent des références ; elles ne sont ni extraites ni validées automatiquement. Les mesures importées restent en attente de validation et ne modifient pas le catalogue.
 

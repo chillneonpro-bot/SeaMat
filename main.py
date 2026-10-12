@@ -30,6 +30,7 @@ from seamat.planning import experiment_plan, experiment_plan_workbook
 from seamat.engine_v2 import (ENGINE_VERSION, Request, capability_summary,
                               predict_from_evidence)
 from seamat.reliability import GATE_VERSION, material_coverage
+from seamat.analog_model import rank_analogs, MIN_ANALOG_SCORE
 import plotly.graph_objects as go
 
 ROOT=Path(__file__).parent
@@ -78,6 +79,24 @@ def custom_materials() -> list[dict]:
 
 def available_materials() -> dict[str,dict]:
     return {m['id']:m for m in material_db.catalog()+custom_materials()}
+
+def recommended_horizon(material: dict, exposure: str) -> tuple[float,str]:
+    """Keep the first view inside a published analogue window when one exists."""
+    source_id=str(material.get('id') or '')
+    if material.get('custom'):
+        analogs=rank_analogs(material,exposure)
+        if analogs and analogs[0]['eligible']:
+            source_id=analogs[0]['material_id']
+    rows=material_db.model_evidence_rows(source_id,exposure)
+    by_source={}
+    for row in rows:
+        try:
+            source=str(row.get('source_id') or 'source')
+            by_source[source]=max(by_source.get(source,0.),float(row.get('time_days')))
+        except (TypeError,ValueError): pass
+    # The V2 ensemble is limited to the common documented window, so the
+    # initial UI horizon must use the shortest source window as well.
+    return (min(by_source.values()),'days') if by_source else (2.,'years')
 
 def sign_out() -> None:
     app.storage.user.pop('user_id',None)
@@ -224,16 +243,28 @@ def materials():
                     ui.label(label).classes('stat-label'); ui.label(value).classes('stat-value'); ui.label(detail).classes('small')
         with ui.expansion('Ajouter un matériau personnalisé',icon='add_circle').classes('w-full mt-5'):
             with ui.column().classes('p-4 gap-4 w-full'):
-                ui.label('Créer une fiche utilisable dans les estimations et comparaisons').classes('section-title')
-                ui.label('Cette fiche reste déclarée par l’utilisateur. Elle n’est pas ajoutée au corpus scientifique tant qu’aucune campagne de mesures n’a été revue.').classes('note w-full')
+                ui.label('Créer une fiche et rechercher un analogue publié').classes('section-title')
+                ui.label('SeaMat compare la description au corpus vérifié. Une estimation exploitable est produite uniquement si un analogue proche franchit le seuil de similarité et si le calcul reste dans sa fenêtre publiée.').classes('note w-full')
                 with ui.row().classes('w-full gap-3 flex-wrap'):
                     custom_name=ui.input('Nom du matériau',placeholder='PP recyclé — grade interne').props('outlined').classes('grow min-w-64')
                     custom_abbr=ui.input('Abréviation',placeholder='R-PP').props('outlined').classes('min-w-48')
                     custom_family=ui.input('Famille',placeholder='Polyoléfine').props('outlined').classes('grow min-w-56')
                 with ui.row().classes('w-full gap-3 flex-wrap'):
+                    custom_base=ui.input('Polymère de base',placeholder='PP, IIR, PET…').props('outlined').classes('grow min-w-48')
+                    custom_subtype=ui.input('Sous-type / formulation',placeholder='Homopolymère, copolymère…').props('outlined').classes('grow min-w-56')
                     custom_e0=ui.number('Module initial de la fiche (MPa)',min=.01,value=1000).props('outlined').classes('grow min-w-56')
+                with ui.row().classes('w-full gap-3 flex-wrap'):
                     custom_mechanisms=ui.input('Mécanismes attendus',placeholder='Photo-oxydation; thermo-oxydation').props('outlined').classes('grow min-w-72')
-                custom_reference=ui.input('Référence de la fiche ou du grade',placeholder='Fabricant, grade, lot, URL ou document interne').props('outlined').classes('w-full')
+                    custom_process=ui.select(['Injection','Extrusion','Moulage compression','Thermoformage','Autre'],label='Procédé').props('outlined clearable').classes('grow min-w-48')
+                    custom_morphology=ui.select(['Semi-cristallin','Amorphe','Réticulé','Inconnu'],value='Inconnu',label='Morphologie').props('outlined').classes('grow min-w-48')
+                with ui.row().classes('w-full gap-3 flex-wrap'):
+                    custom_reinforcement=ui.input('Renfort / charge',placeholder='Aucun, fibres de verre, talc…').props('outlined').classes('grow min-w-56')
+                    custom_reinforcement_pct=ui.number('Taux de renfort (%)',min=0,max=100,value=0).props('outlined').classes('min-w-48')
+                    custom_recycled_pct=ui.number('Contenu recyclé (%)',min=0,max=100,value=0).props('outlined').classes('min-w-48')
+                with ui.row().classes('w-full gap-3 flex-wrap'):
+                    custom_stabilizers=ui.input('Additifs / stabilisants',placeholder='Anti-UV, antioxydant, non connu…').props('outlined').classes('grow min-w-64')
+                    custom_exposure=ui.select({'indoor':'Intérieur / abrité','outdoor':'Extérieur / UV','immersion':'Immersion'},value='outdoor',label='Milieu visé').props('outlined').classes('min-w-56')
+                custom_reference=ui.input('Référence exacte de la fiche ou du grade',placeholder='Fabricant, grade, lot, URL ou document interne').props('outlined').classes('w-full')
                 def save_custom_material():
                     name=(custom_name.value or '').strip(); abbreviation=(custom_abbr.value or '').strip().upper()
                     family_name=(custom_family.value or '').strip(); mechanisms=(custom_mechanisms.value or '').strip()
@@ -245,23 +276,40 @@ def materials():
                     store.save(owner(),'custom_material',name,{
                         'id':ident,'name':name[:120],'abbreviation':abbreviation[:20],
                         'category':'Matériau personnalisé','subcategory':family_name[:100],
-                        'family':family_name[:100],'subtype':'Grade ou formulation utilisateur',
+                        'family':family_name[:100],'subtype':((custom_subtype.value or '').strip() or 'Grade ou formulation utilisateur')[:120],
+                        'base_polymer':(custom_base.value or '').strip()[:80],
                         'priority':3,'mechanisms':mechanisms[:300] or 'Non renseigné',
                         'target_property':'Module de Young en traction',
                         'note':(custom_reference.value or 'Fiche saisie manuellement, référence non renseignée.')[:500],
+                        'grade_reference':(custom_reference.value or '').strip()[:300],
+                        'process_state':(custom_process.value or '').strip()[:100],
+                        'morphology':(custom_morphology.value or 'Inconnu')[:80],
+                        'reinforcement':((custom_reinforcement.value or '').strip() or 'Aucun')[:120],
+                        'reinforcement_pct':float(custom_reinforcement_pct.value or 0),
+                        'recycled_content_pct':float(custom_recycled_pct.value or 0),
+                        'stabilizers':(custom_stabilizers.value or '').strip()[:200],
+                        'service_exposure':custom_exposure.value,
                         'suggested_modulus_mpa':modulus,
                     })
-                    ui.notify('Matériau personnalisé ajouté.',type='positive'); ui.navigate.to('/materiaux')
+                    ui.notify('Matériau ajouté. SeaMat évaluera ses analogues au calcul.',type='positive'); ui.navigate.to('/materiaux')
                 ui.button('Ajouter à mes matériaux',icon='add',on_click=save_custom_material).props('unelevated')
         mine=custom_materials()
         if mine:
             with ui.column().classes('panel w-full mt-5 gap-3'):
                 ui.label('Mes matériaux personnalisés').classes('section-title')
                 for custom in mine:
+                    analogs=rank_analogs(custom,custom.get('service_exposure') or 'outdoor')
+                    best=analogs[0] if analogs else None
                     with ui.row().classes('row-line w-full items-center justify-between gap-3'):
                         with ui.column().classes('gap-1'):
                             ui.label(f"{custom['name']} ({custom['abbreviation']})").classes('font-medium')
-                            ui.label(f"{custom['family']} · E₀ = {custom['suggested_modulus_mpa']:g} MPa · données utilisateur non validées").classes('small')
+                            ui.label(f"{custom['family']} · E₀ = {custom['suggested_modulus_mpa']:g} MPa").classes('small')
+                            if best:
+                                ui.label(f"Meilleur analogue : {best['material_name']} · {best['score']}/100 · "
+                                         +('calcul par analogue possible' if best['eligible'] else f'seuil requis {MIN_ANALOG_SCORE}/100')).classes(
+                                             'pill pill-teal' if best['eligible'] else 'pill pill-amber')
+                            else:
+                                ui.label('Aucun analogue publié dans ce milieu.').classes('pill pill-amber')
                         with ui.row().classes('gap-2'):
                             button('Utiliser',f"/simuler/estimation?material={custom['id']}",'science').props('outline')
                             def ask_remove_custom(custom=custom):
@@ -403,6 +451,8 @@ def simulator_hub(material: str | None=None):
 def datasheet_simulator(material: str | None=None):
     own=owner(); materials=available_materials()
     selected=material if material in materials else 'PP'; initial=standard_profile(materials[selected])
+    initial_exposure=materials[selected].get('service_exposure') or 'outdoor'
+    initial_horizon,initial_horizon_unit=recommended_horizon(materials[selected],initial_exposure)
     with shell('/simuler','Fiche matériau'):
         intro('Simulation','Estimer le vieillissement d’un matériau',
               'Choisissez le matériau, ses conditions d’utilisation et la durée à étudier.')
@@ -414,10 +464,10 @@ def datasheet_simulator(material: str | None=None):
                 material_select=ui.select(options,value=selected,label='Matériau').props('outlined use-input').classes('w-full')
                 with ui.row().classes('w-full gap-3 flex-wrap'):
                     temperature=ui.number('Température (°C)',value=23,min=-40,max=160).props('outlined').classes('grow min-w-48')
-                    exposure=ui.select({'indoor':'Intérieur / abrité','outdoor':'Extérieur / UV','immersion':'Immersion / contact permanent'},value='outdoor',label='Milieu').props('outlined').classes('grow min-w-56')
+                    exposure=ui.select({'indoor':'Intérieur / abrité','outdoor':'Extérieur / UV','immersion':'Immersion / contact permanent'},value=initial_exposure,label='Milieu').props('outlined').classes('grow min-w-56')
                 with ui.row().classes('w-full gap-3 flex-wrap'):
-                    horizon=ui.number('Durée à étudier',value=120 if selected=='PP' else 2,min=.01).props('outlined').classes('grow min-w-48')
-                    horizon_unit=ui.select({'days':'Jours','months':'Mois','years':'Années'},value='days' if selected=='PP' else 'years',label='Unité').props('outlined').classes('min-w-48')
+                    horizon=ui.number('Durée à étudier',value=initial_horizon,min=.01).props('outlined').classes('grow min-w-48')
+                    horizon_unit=ui.select({'days':'Jours','months':'Mois','years':'Années'},value=initial_horizon_unit,label='Unité').props('outlined').classes('min-w-48')
                     threshold=ui.number('Seuil conservé (%)',value=80,min=1,max=100).props('outlined').classes('grow min-w-48')
                 with ui.expansion('Paramètres avancés',icon='tune').classes('w-full'):
                     with ui.column().classes('w-full gap-4 p-3'):
@@ -428,8 +478,8 @@ def datasheet_simulator(material: str | None=None):
                             thickness=ui.number('Épaisseur (mm)',value=2,min=.01).props('outlined').classes('grow min-w-48')
                         immersion_medium=ui.select({'unspecified':'Non précisé / autre liquide','water':'Eau','milform64':'Milform 64 SST'},
                             value='unspecified',label='Liquide, si immersion').props('outlined').classes('w-full')
-                        grade_reference=ui.input('Grade / référence commerciale',placeholder='Ex. PP H301').props('outlined').classes('w-full')
-                        process_state=ui.input('Procédé / état de conditionnement',placeholder='Ex. injection, conditionné à 23 °C').props('outlined').classes('w-full')
+                        grade_reference=ui.input('Grade / référence commerciale',value=materials[selected].get('grade_reference') or '',placeholder='Ex. PP H301').props('outlined').classes('w-full')
+                        process_state=ui.input('Procédé / état de conditionnement',value=materials[selected].get('process_state') or '',placeholder='Ex. injection, conditionné à 23 °C').props('outlined').classes('w-full')
                         ui.label('En immersion, l’humidité de l’air est ignorée. Les données IIR publiées exigent Milform 64 SST entre 80 et 120 °C.').classes('field-help mt-0')
                         ui.label('Conversion : 1 année = 365,25 jours ; 1 mois moyen = 30,4375 jours.').classes('field-help mt-0')
                 def selected_evidence():
@@ -464,11 +514,13 @@ def datasheet_simulator(material: str | None=None):
                 calculate_slot=ui.row().classes('w-full')
                 output=ui.column().classes('w-full')
                 def change_material():
-                    profile=standard_profile(materials[material_select.value])
+                    mat=materials[material_select.value]; profile=standard_profile(mat)
                     e0.value=profile['suggested_modulus_mpa']; basis.text=profile['basis']
-                    grade_reference.value=''; process_state.value=''
-                    if material_select.value=='PP': horizon.value=120; horizon_unit.value='days'
-                    else: horizon.value=2; horizon_unit.value='years'
+                    grade_reference.value=mat.get('grade_reference') or ''
+                    process_state.value=mat.get('process_state') or ''
+                    if mat.get('service_exposure'): exposure.value=mat['service_exposure']
+                    default_horizon,default_unit=recommended_horizon(mat,exposure.value)
+                    horizon.value=default_horizon; horizon_unit.value=default_unit
                     preparation_panel.refresh()
                 material_select.on_value_change(lambda:change_material())
                 for control in (e0,grade_reference,process_state,temperature,humidity,thickness,exposure,immersion_medium,horizon,horizon_unit):
@@ -522,6 +574,20 @@ def datasheet_simulator(material: str | None=None):
                                 for label,value,detail in result_cards:
                                     with ui.column().classes('result-stat gap-1'):
                                         ui.label(label).classes('stat-label'); ui.label(value).classes('result-value'); ui.label(detail).classes('small')
+                            analog_transfer=assumptions.get('analog_transfer') or {}
+                            analog_search=assumptions.get('analog_search') or {}
+                            if analog_transfer:
+                                ui.label(
+                                    f"Analogue utilisé : {analog_transfer['source_material_name']} · "
+                                    f"similarité {analog_transfer['similarity_score']}/100. "
+                                    "La bande inclut une pénalité de transfert vers votre formulation."
+                                ).classes('pill pill-teal w-full')
+                            elif analog_search:
+                                best=analog_search.get('best') or {}
+                                message=(f"Analogue refusé : {best.get('material_name')} · {best.get('score',0)}/100, "
+                                         f"seuil requis {analog_search.get('minimum_score',MIN_ANALOG_SCORE)}/100."
+                                         if best else 'Aucun analogue publié compatible avec le milieu choisi.')
+                                ui.label(message).classes('note w-full')
                             band_mode=None
                             if result.get('outer_lower'):
                                 band_mode=ui.select({
@@ -538,8 +604,11 @@ def datasheet_simulator(material: str | None=None):
                                 band_mode.on_value_change(lambda:result_chart.refresh())
                             result_chart()
                             summary_text=(
-                                f"Valeur de présélection dans le domaine couvert : {central_text} pour atteindre {threshold.value:g} %. "
-                                f"Bande associée : {interval_text}."
+                                (f"Dans la fenêtre couverte, le module estimé à {horizon_text} est de "
+                                 f"{number_fr(result['modulus'][-1])} MPa et le seuil de {threshold.value:g} % n’est pas atteint."
+                                 if crossing is None else
+                                 f"Valeur de présélection dans le domaine couvert : {central_text} pour atteindre {threshold.value:g} %. "
+                                 f"Bande associée : {interval_text}.")
                                 if reliability.get('usable_for_screening') else
                                 "Aucune durée de vie exploitable n’est disponible pour ce cas. La courbe reste un scénario de recherche à confronter à des données compatibles."
                             )
@@ -1104,9 +1173,10 @@ def compare():
                                     values.append((mat['name'],result))
                                     summary.append({'materiau':mat['name'],'module_initial_mpa':round(profile['suggested_modulus_mpa'],2),
                                         'module_final_mpa':round(result['modulus'][-1],2),'retention_finale_pct':round(result['retention'][-1],1),
-                                        'seuil':format_years_months(result['crossing_estimate_years']),
+                                        'seuil':(format_years_months(result['crossing_estimate_years'])
+                                                 if result.get('crossing_estimate_years') is not None else 'Non atteint'),
                                         'origine':curve_value_origin(result),
-                                        'niveau':'Personnalisé / hypothèses' if mat.get('custom') else evidence_assessment(result)['label']})
+                                        'niveau':evidence_assessment(result)['label']})
                                 compatibility=comparison_assessment(values); comparison_panel(compatibility)
                                 if not compatibility['can_compare']:
                                     ui.label('Les courbes ne sont pas tracées tant que la propriété comparée diffère.').classes('note w-full'); return

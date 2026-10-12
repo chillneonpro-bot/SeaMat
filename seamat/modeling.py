@@ -70,10 +70,8 @@ def format_years_months(years: float) -> str:
 
 def standard_profile(material: dict) -> dict:
     """Return a traceable grade value when available, otherwise a family default."""
-    if material.get('custom') and float(material.get('suggested_modulus_mpa') or 0)>0:
-        return {'suggested_modulus_mpa':float(material['suggested_modulus_mpa']),
-                'reference_half_life_years':8.,
-                'basis':'Module saisi dans votre fiche personnalisée ; cinétique générique non validée.'}
+    custom_modulus=(float(material.get('suggested_modulus_mpa') or 0)
+                    if material.get('custom') else 0.)
     raw=' '.join(str(material.get(k,'')) for k in ('id','family','subcategory','subtype','mechanisms')).lower()
     text=''.join(c for c in unicodedata.normalize('NFKD',raw) if not unicodedata.combining(c))
     if 'composite' in text: e0,life=26000.,5.
@@ -86,6 +84,12 @@ def standard_profile(material: dict) -> dict:
     elif 'polyurethane' in text: e0,life=50.,4.
     elif 'polyolefine' in text: e0,life=1100.,10.
     else: e0,life=2200.,8.
+    if custom_modulus>0:
+        return {'suggested_modulus_mpa':custom_modulus,
+                'reference_half_life_years':life,
+                'basis':('Module saisi dans votre fiche personnalisée. SeaMat recherche automatiquement '
+                         'un analogue publié compatible ; la cinétique de famille ne sert que si aucun '
+                         'analogue ne franchit le seuil de similarité.')}
     # Import lazily to avoid coupling the numerical module to database setup at
     # import time. A datasheet value changes E0 only; it never validates the
     # generic ageing rate used for materials without time series.
@@ -365,6 +369,7 @@ def estimate_from_datasheet(material: dict, modulus_mpa: float, temperature_c: f
     days=np.linspace(0,horizon_years*365.25,241)
     target=threshold_percent/100
     compatible_rows=evidence_rows or []
+    analog_audit=None
     if exposure=='immersion':
         wanted={'milform64':'milform 64 sst','Milform 64 SST':'milform 64 sst'}.get(immersion_medium)
         compatible_rows=[r for r in compatible_rows if wanted and wanted in str(r.get('medium','')).lower()]
@@ -383,6 +388,27 @@ def estimate_from_datasheet(material: dict, modulus_mpa: float, temperature_c: f
         if routed is not None:
             from seamat.reliability import apply_reliability_gate
             return apply_reliability_gate(routed)
+    if material.get('custom'):
+        # A material entered by a user has no time series of its own.  Try a
+        # strict, auditable transfer from a reviewed analogue before falling
+        # back to the visibly non-qualified family scenario.
+        from seamat.analog_model import predict_from_analogs, rank_analogs, MIN_ANALOG_SCORE
+        routed=predict_from_analogs(
+            material,float(modulus_mpa),float(temperature_c),float(humidity_rh),
+            float(thickness_mm),float(horizon_years*365.25),float(threshold_percent),
+            exposure,immersion_medium,grade_reference,process_state,
+        )
+        if routed is not None:
+            from seamat.reliability import apply_reliability_gate
+            return apply_reliability_gate(routed)
+        analogs=rank_analogs({**material,
+                              'grade_reference':grade_reference or material.get('grade_reference'),
+                              'process_state':process_state or material.get('process_state')},exposure)
+        analog_audit={
+            'minimum_score':MIN_ANALOG_SCORE,
+            'best':analogs[0] if analogs else None,
+            'status':'insufficient_similarity' if analogs else 'no_evidence_in_environment',
+        }
     if exposure=='outdoor':
         # PP has one homogeneous, directly tabulated case with four related
         # formulations. Prefer its held-out formulation benchmark to a broad
@@ -587,6 +613,7 @@ def estimate_from_datasheet(material: dict, modulus_mpa: float, temperature_c: f
                        'profile_method':(('surface température-temps publiée, interpolation dans le domaine' if observed_profile.get('profile_kind')=='temperature_surface' else 'médiane inter-études normalisée et calibration leave-one-source-out' if observed_profile.get('profile_kind')=='source_ensemble' else 'rétention médiane PP H301 et validation leave-one-formulation-out' if observed_profile.get('profile_kind')=='same_study_formulation_holdout' else 'médiane normalisée 0-30-120 jours puis vitesse tardive') if evidence_calibrated else None),
                        'evidence_window_days':evidence_window_days,
                        'extrapolation_multiple':extrapolation_multiple,
+                       'analog_search':analog_audit,
                        'rate_bounds_per_day':[low_rate,high_rate],
                        'outer_crossing_interval_years':[outer_low_cross,outer_high_cross]},
         'evidence_level':evidence_level,
@@ -627,7 +654,7 @@ def evidence_assessment(result: dict) -> dict:
     if reliability:
         code=reliability.get('code')
         level=('Niveau 3 sur 4' if code=='externally_supported' else
-               'Niveau 2 sur 4' if code in {'internally_supported','published_exact_unvalidated'} else
+               'Niveau 2 sur 4' if code in {'internally_supported','published_exact_unvalidated','analog_supported_limited'} else
                'Niveau 1 sur 4')
         return {
             'level':level,'label':reliability.get('label','Statut non renseigné'),
