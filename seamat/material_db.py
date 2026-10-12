@@ -1068,6 +1068,16 @@ def evidence_rows(material_id: str, exposure_mode: str | None = None) -> list[di
     with store.connect() as conn:
         return [dict(r) for r in conn.execute(query,args).fetchall()]
 
+
+def model_evidence_rows(material_id: str, exposure_mode: str | None = None) -> list[dict]:
+    """Return every reviewed row eligible for the V2 router.
+
+    Curated table values and institution-reviewed imports remain stored in
+    separate tables. The engine receives both and normalizes their schemas;
+    pending or rejected imports are never returned here.
+    """
+    return evidence_rows(material_id,exposure_mode)+observation_rows(material_id,include_pending=False)
+
 def source(source_id: str) -> dict | None:
     migrate()
     with store.connect() as conn:

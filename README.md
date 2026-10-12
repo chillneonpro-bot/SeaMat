@@ -2,13 +2,13 @@
 
 **Python 3.11–3.13 · Windows · macOS · Linux · Docker**
 
-Version actuelle : **2.0.0**. SeaMat est la nouvelle branche de développement scientifique issue de Materia 0.46. Elle possède son propre code, sa propre base SQLite, ses propres secrets et son propre port. Materia reste disponible sur le port 8087 ; SeaMat utilise le port 8088 et les deux logiciels peuvent fonctionner simultanément.
+Version actuelle : **2.1.0**. SeaMat est la nouvelle branche de développement scientifique issue de Materia 0.46. Elle possède son propre code, sa propre base SQLite, ses propres secrets et son propre port. Materia reste disponible sur le port 8087 ; SeaMat utilise le port 8088 et les deux logiciels peuvent fonctionner simultanément.
 
-Cette première version de SeaMat conserve le catalogue, les simulations, les comparaisons, les exports, l'espace classe et les validations existantes. Elle sert de base stable pour développer le moteur V2 décrit dans [l'architecture scientifique SeaMat V2](docs/ARCHITECTURE_SCIENTIFIQUE_V2.md). Voir aussi [l'installation complète](docs/INSTALLATION.md) et [la comparaison aux essais réels](docs/COMPARAISON_ESSAIS_REELS_V0.46.md). Le guide illustré v0.38, conservé en PDF et Word, documente l'interface héritée et sera remplacé après stabilisation de l'interface V2.
+SeaMat conserve le catalogue, les simulations, les comparaisons, les exports, l'espace classe et les validations existantes. Le moteur V2 et ses dix contrôles sont décrits dans [l'architecture scientifique](docs/ARCHITECTURE_SCIENTIFIQUE_V2.md) et leurs résultats chiffrés dans [la validation du moteur V2.1](docs/VALIDATION_MOTEUR_V2.1.md). Voir aussi [l'installation complète](docs/INSTALLATION.md) et [la comparaison aux essais réels](docs/COMPARAISON_ESSAIS_REELS_V0.46.md).
 
 Application Python de découverte et d'exploration du vieillissement des polymères. Interface NiceGUI, graphiques Plotly, calcul NumPy/SciPy et persistance SQLite.
 
-**État : socle V2 fonctionnel pour l’exploration, la comparaison et un pilote de classe.** SeaMat distingue les projections documentaires, les mesures publiées et les données synthétiques. La fiabilité reste liée aux données disponibles pour chaque grade et chaque environnement ; le moteur V2 renforcera progressivement la sélection des modèles, la validation externe et le calcul de l'incertitude.
+**État : moteur V2 fonctionnel pour l’exploration, la comparaison et un pilote de classe.** Lorsqu’un corpus compatible existe, SeaMat reproduit les points publiés par interpolation PCHIP, sélectionne une loi de prolongement parmi plusieurs modèles, masque des séries entières pour mesurer l’erreur et calibre une bande prédictive sur ces erreurs. Sans données temporelles compatibles, le logiciel conserve une estimation documentaire de famille et l’identifie clairement comme telle.
 
 ## Ouvrir SeaMat
 

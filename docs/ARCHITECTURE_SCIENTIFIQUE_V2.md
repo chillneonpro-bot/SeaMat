@@ -1,12 +1,14 @@
 # Architecture scientifique SeaMat V2
 
+> État au 12 octobre 2026 : les dix contrôles décrits ci-dessous sont implémentés dans le moteur `seamat-evidence-router-2.1.0`. Leur activation scientifique dépend toutefois du corpus disponible pour le matériau demandé. Le détail des essais et des limites figure dans [VALIDATION_MOTEUR_V2.1.md](VALIDATION_MOTEUR_V2.1.md).
+
 ## Objectif
 
 SeaMat doit produire, pour chaque matériau documenté, une courbe centrale de vieillissement, une plage d'incertitude justifiée et une explication courte de la valeur à utiliser. Le logiciel doit rester utilisable sans essai préalable de l'utilisateur, tout en indiquant clairement ce qui provient de mesures publiées, d'un transfert entre matériaux proches ou d'une extrapolation.
 
 ## Principe directeur
 
-Une plage uniforme de ±5 % peut servir à l'affichage et à la comparaison, mais elle ne constitue pas une incertitude scientifique universelle. Le moteur V2 doit conserver cette vue simple et calculer en parallèle une incertitude fondée sur la qualité des sources, la proximité du grade, le domaine couvert et les erreurs mesurées en validation externe.
+Une plage uniforme de ±5 % ne constitue pas une incertitude scientifique universelle. Le moteur V2 calcule une incertitude fondée sur la dispersion publiée, la proximité du grade, le domaine couvert et les erreurs mesurées sur des groupes laissés hors ajustement. L'affichage reste simple, mais ne resserre jamais artificiellement la bande.
 
 ## Données minimales d'un matériau
 
@@ -76,7 +78,22 @@ La publication d'un modèle exige :
 
 L'interface doit toujours afficher ce niveau à côté du résultat.
 
-## Feuille de route
+## Mise en œuvre des dix contrôles
+
+| N° | Contrôle | Mise en œuvre 2.1 |
+|---:|---|---|
+| 1 | Contrat de données | Schéma canonique, valeurs finies, identifiant d'expérience et source obligatoires |
+| 2 | Unités | Jours, degrés Celsius, MPa, pourcentage et millimètres normalisés avant calcul |
+| 3 | Bibliothèque de modèles | Exponentiel, Weibull, exponentiel à plateau et prolongement de fin de courbe |
+| 4 | Routage | Courbe exacte, surface en température, ensemble du même matériau ou repli documentaire |
+| 5 | Correspondance | Score explicite selon matériau, grade, procédé, environnement et horizon |
+| 6 | Domaine | Séparation de l'interpolation et de l'extrapolation ; refus d'une surface hors températures publiées |
+| 7 | Incertitude | Quantile conforme des erreurs logarithmiques, dispersion publiée et pénalité d'extrapolation |
+| 8 | Validation | Expériences, formulations ou températures entières masquées |
+| 9 | Traçabilité | Version, sources, paramètres, domaine et empreinte SHA-256 dans chaque résultat |
+| 10 | Restitution | Interface courte, API de diagnostic, PDF, Markdown et classeur Excel traçables |
+
+## Feuille de route réalisée et restante
 
 ### Phase 1 — Socle isolé
 
@@ -84,25 +101,25 @@ L'interface doit toujours afficher ce niveau à côté du résultat.
 - isoler base, secrets, port, Docker et lanceurs ;
 - conserver le catalogue, les exports et les tests existants.
 
-### Phase 2 — Schéma scientifique
+### Phase 2 — Schéma scientifique — réalisée
 
 - versionner les matériaux, protocoles, environnements et séries ;
 - ajouter les champs de formulation et de traçabilité manquants ;
 - automatiser les contrôles d'unités et de cohérence.
 
-### Phase 3 — Moteur de routage
+### Phase 3 — Moteur de routage — réalisée
 
 - implémenter la bibliothèque de modèles ;
 - choisir automatiquement le modèle selon le domaine ;
 - produire une fiche de calcul reproductible.
 
-### Phase 4 — Incertitude calibrée
+### Phase 4 — Incertitude calibrée — réalisée pour les corpus disposant de groupes masquables
 
 - mesurer les erreurs hors échantillon ;
 - calibrer la couverture des intervalles ;
 - séparer l'affichage simple de la plage scientifique.
 
-### Phase 5 — Qualification
+### Phase 5 — Qualification — en cours
 
 - constituer des cas de référence multi-familles ;
 - publier les cartes de validité ;

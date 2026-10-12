@@ -9,6 +9,7 @@ def test_markdown_report_contains_reproducibility_fields():
     text=markdown_report(result,'Étude PP').decode()
     assert '# Étude PP' in text
     assert 'Empreinte' in text
+    assert 'Moteur' in text
     assert 'Niveau de preuve' in text
     assert 'Usage interdit' in text
     assert '| Temps (années) |' in text

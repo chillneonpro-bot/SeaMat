@@ -96,6 +96,7 @@ def result_pdf(result: dict, title: str='Rapport SeaMat') -> bytes:
     for label,key in (('Référence','title'),('DOI','doi'),('URL','url'),('Emplacement','location')):
         if source.get(key): y=_text(pdf,f'{label} : {source[key]}',46,y,500,size=8)
     y=_text(pdf,'Modèle : '+str(manifest.get('model','Non renseigné')),46,y,500,size=8)
+    y=_text(pdf,'Moteur : '+str(manifest.get('engine_version','Non renseigné')),46,y,500,size=8)
     y=_text(pdf,'Empreinte : '+str(result.get('fingerprint','Non renseigné')),46,y,500,size=7)
     y-=8; y=_section(pdf,'Incertitudes et limites',y)
     for item in diagnostic['uncertainty_budget']:

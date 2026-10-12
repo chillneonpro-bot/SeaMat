@@ -450,7 +450,7 @@ def validity_diagnostic(result: dict) -> dict:
         conclusion='Interpolation utilisable pour l’enseignement dans le domaine observé.' if accepted else 'Ce résultat ne peut pas servir de preuve.'
         recommendation='Ajouter une campagne indépendante et les données brutes par éprouvette.'
     elif model.startswith('datasheet-screening-'):
-        calibrated=manifest.get('evidence_level') in {'case_calibrated_short_term','calibrated_short_term','evidence_informed_short_term'}
+        calibrated=manifest.get('evidence_level') in {'externally_validated_short_term','case_calibrated_short_term','calibrated_short_term','evidence_informed_short_term'}
         multiple=(manifest.get('assumptions') or {}).get('extrapolation_multiple')
         if calibrated and _finite(multiple):
             time_status='bon' if multiple<=1 else 'attention' if multiple<=3 else 'bloquant'

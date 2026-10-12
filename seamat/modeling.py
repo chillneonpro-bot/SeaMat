@@ -337,7 +337,9 @@ def estimate_from_datasheet(material: dict, modulus_mpa: float, temperature_c: f
                             humidity_rh: float, thickness_mm: float, horizon_years: float,
                             threshold_percent: float, exposure: str='indoor',
                             evidence_rows: list[dict] | None = None,
-                            immersion_medium: str | None = None) -> dict:
+                            immersion_medium: str | None = None,
+                            grade_reference: str | None = None,
+                            process_state: str | None = None) -> dict:
     """Engineering screening curve from a datasheet modulus and transparent family factors."""
     values=[modulus_mpa,temperature_c,humidity_rh,thickness_mm,horizon_years,threshold_percent]
     if not np.all(np.isfinite(values)) or modulus_mpa<=0 or thickness_mm<=0 or horizon_years<=0:
@@ -366,6 +368,20 @@ def estimate_from_datasheet(material: dict, modulus_mpa: float, temperature_c: f
     if exposure=='immersion':
         wanted={'milform64':'milform 64 sst','Milform 64 SST':'milform 64 sst'}.get(immersion_medium)
         compatible_rows=[r for r in compatible_rows if wanted and wanted in str(r.get('medium','')).lower()]
+    if compatible_rows:
+        from seamat.engine_v2 import Request, predict_from_evidence
+        routed=predict_from_evidence(Request(
+            material_id=str(material.get('id') or 'UNKNOWN'),
+            material_name=str(material.get('name') or material.get('id') or 'Matériau'),
+            modulus_mpa=float(modulus_mpa),temperature_c=float(temperature_c),
+            humidity_rh=float(humidity_rh),thickness_mm=float(thickness_mm),
+            horizon_days=float(horizon_years*365.25),threshold_percent=float(threshold_percent),
+            exposure=exposure,immersion_medium=immersion_medium,
+            grade_reference=(grade_reference or '').strip() or None,
+            process_state=(process_state or '').strip() or None,
+        ),compatible_rows)
+        if routed is not None:
+            return routed
     if exposure=='outdoor':
         # PP has one homogeneous, directly tabulated case with four related
         # formulations. Prefer its held-out formulation benchmark to a broad
@@ -606,7 +622,7 @@ def evidence_assessment(result: dict) -> dict:
     """Return a student-readable assessment without inventing a precision score."""
     manifest=result.get('manifest',{})
     level=manifest.get('evidence_level')
-    if level in {'case_calibrated_short_term','calibrated_short_term','evidence_informed_short_term'}:
+    if level in {'externally_validated_short_term','case_calibrated_short_term','calibrated_short_term','evidence_informed_short_term'}:
         multiple=(manifest.get('assumptions') or {}).get('extrapolation_multiple')
         if multiple is not None and multiple>3:
             return {
@@ -617,15 +633,15 @@ def evidence_assessment(result: dict) -> dict:
                 'allowed':'Visualiser la conséquence des hypothèses et préparer une campagne plus longue.',
                 'next_step':'Allonger les observations ou réduire l’horizon avant toute interprétation de durée.',
             }
-        if level=='case_calibrated_short_term':
+        if level in {'externally_validated_short_term','case_calibrated_short_term'}:
             calibration=(manifest.get('uncertainty') or {}).get('calibration') or {}
             return {
-                'level':'Niveau 2 sur 4',
-                'label':'Cas PP H301 calibré hors formulation',
+                'level':'Niveau 3 sur 4' if level=='externally_validated_short_term' else 'Niveau 2 sur 4',
+                'label':'Validation externe à court terme' if level=='externally_validated_short_term' else 'Cas calibré hors formulation',
                 'tone':'teal',
                 'meaning':(f"La courbe a été contrôlée sur {calibration.get('test_predictions',8)} prédictions masquées ; "
                            f"erreur relative moyenne {calibration.get('mape_pct',0):.2f} % dans la fenêtre publiée."),
-                'allowed':'Utiliser la courbe centrale et sa bande pour le cas PP H301 entre 0 et 120 jours.',
+                'allowed':'Utiliser la courbe centrale et sa bande dans le domaine documenté.',
                 'next_step':'Valider le transfert si le grade, la formulation, le climat ou l’horizon diffèrent.',
             }
         if level=='calibrated_short_term':

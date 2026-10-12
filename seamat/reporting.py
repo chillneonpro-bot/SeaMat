@@ -17,7 +17,9 @@ def markdown_report(result: dict, title: str = 'Rapport SeaMat') -> bytes:
     display=inputs.get('horizon_display',{}) if model.startswith('datasheet-screening-') else {}
     unit={'days':'jours','months':'mois','years':'années'}.get(display.get('unit'),'années' if model.startswith('datasheet-screening-') else 'jours')
     lines=[f'# {title}','',f'**Généré le :** {datetime.now(timezone.utc).isoformat()}',
-           f'**Modèle :** `{model}`',f'**Statut :** {status}',f'**Empreinte :** `{_clean(result.get("fingerprint"))}`','']
+           f'**Modèle :** `{model}`',
+           f'**Moteur :** `{_clean(manifest.get("engine_version", "Non renseigné"))}`',
+           f'**Statut :** {status}',f'**Empreinte :** `{_clean(result.get("fingerprint"))}`','']
     if model.startswith('datasheet-screening-'):
         assessment=evidence_assessment(result)
         crossing=result.get('crossing_estimate_years'); lo,hi=result.get('crossing_interval',[None,None])
@@ -29,8 +31,8 @@ def markdown_report(result: dict, title: str = 'Rapport SeaMat') -> bytes:
                   f"- Module initial : {float(inputs['e0']):g} MPa",
                   f"- Module conservé à l’horizon : {float(result['retention'][-1]):.1f} %",
                   f"- Origine de la valeur à l’horizon : {curve_value_origin(result)}",
-                  f"- Franchissement central : {format_years_months(float(crossing))}",
-                  f"- Plage de sensibilité : {format_years_months(float(lo))} à {format_years_months(float(hi))}",
+                  f"- Franchissement central : {format_years_months(float(crossing)) if crossing is not None else 'Non atteint'}",
+                  f"- Plage prédictive du franchissement : {format_years_months(float(lo)) if lo is not None else 'Non déterminée'} à {format_years_months(float(hi)) if hi is not None else 'Non déterminée'}",
                   '', '## Paramètres', '',
                   f"- Température : {float(inputs['temperature']):g} °C",
                   f"- Humidité relative : {float(inputs['humidity_RH']):g} %",

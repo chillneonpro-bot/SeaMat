@@ -239,6 +239,7 @@ def result_workbook(result: dict, title: str = "Résultat SeaMat") -> bytes:
     row = _section(summary, fmt, row, "Statut et lecture du résultat", end_col=9)
     row = _write_pair(summary, fmt, row, "Statut", status, end_col=9, value_format=fmt["status"])
     row = _write_pair(summary, fmt, row, "Modèle", manifest.get("model", "Non renseigné"), end_col=9)
+    row = _write_pair(summary, fmt, row, "Moteur de calcul", manifest.get("engine_version", "Non renseigné"), end_col=9)
     row = _write_pair(summary, fmt, row, "Empreinte du calcul", result.get("fingerprint", "Non renseigné"), end_col=9)
     summary.freeze_panes(3, 0)
 
@@ -380,6 +381,7 @@ def result_workbook(result: dict, title: str = "Résultat SeaMat") -> bytes:
     row = _section(details, fmt, row, "Reproductibilité", teal=True)
     row = _write_pair(details, fmt, row, "Date de l'export (UTC)", datetime.now(timezone.utc).replace(microsecond=0).isoformat())
     row = _write_pair(details, fmt, row, "Version du modèle", manifest.get("model", "Non renseigné"))
+    row = _write_pair(details, fmt, row, "Version du moteur", manifest.get("engine_version", "Non renseigné"))
     row = _write_pair(details, fmt, row, "Jeu de données", manifest.get("dataset", "Non renseigné"))
     _write_pair(details, fmt, row, "Empreinte SHA-256", result.get("fingerprint", "Non renseigné"))
     details.freeze_panes(3, 0)

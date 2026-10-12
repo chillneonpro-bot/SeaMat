@@ -27,6 +27,8 @@ from seamat.validation import (pp_literature_only_benchmark, pp_temporal_holdout
 from seamat.blind_prediction import compare_with_experiment, freeze_prediction, parse_validation_file
 from seamat.readiness import comparison_assessment, preparation_assessment
 from seamat.planning import experiment_plan, experiment_plan_workbook
+from seamat.engine_v2 import (ENGINE_VERSION, Request, capability_summary,
+                              predict_from_evidence)
 import plotly.graph_objects as go
 
 ROOT=Path(__file__).parent
@@ -433,7 +435,7 @@ def datasheet_simulator(material: str | None=None):
                     mat=materials[material_select.value]
                     if mat.get('custom'):
                         return []
-                    rows=material_db.evidence_rows(mat['id'],exposure.value)
+                    rows=material_db.model_evidence_rows(mat['id'],exposure.value)
                     if exposure.value=='immersion' and immersion_medium.value!='milform64':
                         return []
                     if mat['id']=='IIR' and not 80<=float(temperature.value or 0)<=120:
@@ -480,7 +482,7 @@ def datasheet_simulator(material: str | None=None):
                         evidence=selected_evidence()
                         result=estimate_from_datasheet(mat,float(e0.value),float(temperature.value),float(humidity.value),
                             float(thickness.value),horizon_years,float(threshold.value),exposure.value,evidence,
-                            immersion_medium.value)
+                            immersion_medium.value,grade_reference.value or None,process_state.value or None)
                         result['manifest']['inputs']['horizon_display']={'value':float(horizon.value),'unit':horizon_unit.value,
                             'label':duration_label(float(horizon.value),horizon_unit.value)}
                         result['manifest']['inputs']['grade_reference']=(grade_reference.value or '').strip() or None
@@ -500,10 +502,12 @@ def datasheet_simulator(material: str | None=None):
                             horizon_text=result['manifest']['inputs']['horizon_display']['label']
                             central_text=format_years_months(crossing) if crossing is not None else 'Non atteint'
                             interval_text=(f"{format_years_months(lo)} – {format_years_months(hi)}"
-                                           if crossing is not None else 'Non calculable')
+                                           if crossing is not None and lo is not None and hi is not None
+                                           else 'Non borné dans le domaine calculé')
+                            interval_detail=result['manifest']['uncertainty'].get('label','Plage du modèle')
                             result_cards=[
                                 ('Temps estimé pour atteindre le seuil',central_text,f"Seuil choisi : {threshold.value:g} %"),
-                                ('Plage estimée',interval_text,'10 % au total'),
+                                ('Plage estimée',interval_text,interval_detail),
                                 (f'Module à {horizon_text}',f"{number_fr(result['modulus'][-1])} MPa",f"{number_fr(result['retention'][-1],1)} % conservés"),
                             ]
                             with ui.element('div').classes('result-grid w-full'):
@@ -615,6 +619,18 @@ def datasheet_simulator(material: str | None=None):
                                             {'label':'Erreur source dans la fenêtre','value':f"± {number_fr(calibration['empirical_half_width_pct'],2)} %",'meaning':'Erreur relative maximale des huit prédictions masquées, conservée pour l’audit'},
                                             {'label':'Couverture interne','value':f"{number_fr(calibration['empirical_point_coverage_pct'],0)} %",'meaning':'Couverture observée sur les huit valeurs masquées ; pas une garantie externe'},
                                             {'label':'Après 120 jours','value':'Information documentaire conservée' if scientific_uncertainty_kind=='observed_rate_envelope_extrapolation' else 'Non applicable','meaning':'La plage visible reste standardisée'},
+                                        ]
+                                    elif scientific_uncertainty_kind=='v2_holdout_validation':
+                                        calibration=source_uncertainty.get('calibration') or {}
+                                        selected=assumptions.get('selected_kinetic_model','non renseigné')
+                                        method_rows=[
+                                            {'label':'Moteur','value':result['manifest'].get('engine_version',ENGINE_VERSION),'meaning':'Version figée dans le résultat et les exports'},
+                                            {'label':'Routage retenu','value':assumptions.get('profile_method','non renseigné'),'meaning':'Choisi selon les séries et les conditions compatibles'},
+                                            {'label':'Modèle après observations','value':selected,'meaning':'Sélection multi-modèles ; utilisé seulement après la dernière mesure'},
+                                            {'label':'Validation masquée','value':f"{calibration.get('test_predictions',0)} prédictions",'meaning':'Chaque groupe cible est retiré avant son calcul'},
+                                            {'label':'Erreur relative moyenne','value':f"{number_fr(calibration.get('mape_pct') or 0,2)} %",'meaning':'Mesurée sur les valeurs tenues à l’écart'},
+                                            {'label':'Couverture observée','value':f"{number_fr(calibration.get('empirical_point_coverage_pct') or 0,1)} %",'meaning':result['manifest']['uncertainty'].get('coverage','')},
+                                            {'label':'Largeur à la source','value':f"± {number_fr(result['manifest']['uncertainty'].get('base_half_width_pct') or 0,2)} %",'meaning':'Elle augmente automatiquement après la fenêtre publiée'},
                                         ]
                                     else:
                                         method_rows=[
@@ -834,7 +850,7 @@ def legacy_simulator(material: str | None=None):
                     result=estimate_from_datasheet(mat,float(estimate_e0.value),float(estimate_temp.value),
                         float(estimate_rh.value),float(estimate_thickness.value),horizon_years,
                         float(estimate_threshold.value),estimate_exposure.value,
-                        material_db.evidence_rows(mat['id'],estimate_exposure.value) if not mat.get('custom') else [])
+                        material_db.model_evidence_rows(mat['id'],estimate_exposure.value) if not mat.get('custom') else [])
                     result['manifest']['inputs']['horizon_display']={'value':float(estimate_horizon.value),'unit':estimate_horizon_unit.value,
                         'label':duration_label(float(estimate_horizon.value),estimate_horizon_unit.value)}
                     refresh_result_fingerprint(result)
@@ -1070,7 +1086,7 @@ def compare():
                                     result=estimate_from_datasheet(mat,profile['suggested_modulus_mpa'],float(compare_temp.value),
                                         float(compare_rh.value),float(compare_thickness.value),horizon_years,
                                         float(compare_threshold.value),compare_exposure.value,
-                                        material_db.evidence_rows(ident,compare_exposure.value) if not mat.get('custom') else [])
+                                        material_db.model_evidence_rows(ident,compare_exposure.value) if not mat.get('custom') else [])
                                     result['manifest']['inputs']['horizon_display']={'value':float(compare_horizon.value),'unit':compare_unit.value,
                                         'label':duration_label(float(compare_horizon.value),compare_unit.value)}
                                     refresh_result_fingerprint(result)
@@ -1141,6 +1157,7 @@ def compare():
 @ui.page('/validite')
 def validity_page():
     rows=material_db.evidence_rows('PP','outdoor')
+    v2_controls=capability_summary(rows)
     literature_report=pp_literature_only_benchmark(rows)
     report=pp_temporal_holdout(rows)
     iir_rows=material_db.evidence_rows('IIR','immersion')
@@ -1153,6 +1170,9 @@ def validity_page():
               'Cette page compare les prédictions de SeaMat aux modules réellement publiés et sépare clairement la fenêtre vérifiée de l’extrapolation.')
         with ui.row().classes('w-full justify-end'):
             button('Comparer une prédiction figée','/validation-aveugle','fact_check').props('outline')
+        with ui.expansion('Moteur SeaMat V2 · 10 contrôles actifs',icon='memory').classes('w-full mt-5'):
+            ui.label(f"Version {v2_controls['engine_version']} · chaque résultat conserve le routage, le modèle, la validation et l’empreinte du calcul.").classes('body-copy p-3 pb-0')
+            table_rows(v2_controls['controls'],['id','name','status'])
         with ui.element('div').classes('result-grid w-full mt-5'):
             for label,value,detail in [
                 ('Erreur absolue moyenne',f"{number_fr(literature_report['mae_mpa'],1)} MPa",'Prédictions à 30 et 120 jours'),
@@ -2040,7 +2060,8 @@ def document_library():
         render(owner(),download_json)
 
 @app.get('/health')
-def health(): return {'status':'ok','version':__version__,'scientific_validation':False,'review_protection':reviewer_configured(),'local_accounts':True}
+def health(): return {'status':'ok','version':__version__,'engine_version':ENGINE_VERSION,
+                      'scientific_validation':False,'review_protection':reviewer_configured(),'local_accounts':True}
 
 @app.get('/health/readiness')
 def readiness():
@@ -2069,6 +2090,55 @@ def material_api(material_id: str):
             'reference_properties':material_db.reference_properties(item['id']),
             'scientific_audit':material_db.corpus_audit(item['id']),
             'accepted_observations':material_db.accepted_rows(item['id'])}
+
+@app.get('/api/v2/capabilities/{material_id}')
+def v2_capabilities_api(material_id: str):
+    item=material_db.material(material_id.upper())
+    if not item:
+        raise HTTPException(status_code=404,detail={'error':'Matériau inconnu','material_id':material_id})
+    rows=material_db.model_evidence_rows(item['id'])
+    return {'material_id':item['id'],'material_name':item['name'],**capability_summary(rows)}
+
+def _v2_benchmark_case(material_id: str, temperature_c: float, horizon_days: float,
+                       exposure: str, immersion_medium: str | None = None) -> dict:
+    material=material_db.material(material_id)
+    rows=material_db.model_evidence_rows(material_id,exposure)
+    result=predict_from_evidence(Request(
+        material_id=material_id,material_name=material['name'],modulus_mpa=1000.,
+        temperature_c=temperature_c,humidity_rh=50.,thickness_mm=2.,
+        horizon_days=horizon_days,threshold_percent=80.,exposure=exposure,
+        immersion_medium=immersion_medium,
+    ),rows)
+    if result is None:
+        return {'material_id':material_id,'status':'corpus incompatible'}
+    assumptions=result['manifest']['assumptions']; uncertainty=result['manifest']['uncertainty']
+    validation=assumptions['validation']
+    return {
+        'material_id':material_id,'material_name':material['name'],
+        'temperature_c':temperature_c,'horizon_days':horizon_days,
+        'route':assumptions['profile_method'],
+        'selected_model':assumptions['selected_kinetic_model'],
+        'retention_at_horizon_pct':round(result['retention'][-1],4),
+        'prediction_half_width_pct':round(uncertainty['base_half_width_pct'],4),
+        'hidden_predictions':validation['test_predictions'],
+        'hidden_mape_pct':validation['mape_pct'],
+        'hidden_coverage_pct':validation['empirical_point_coverage_pct'],
+        'status':result['manifest']['status'],
+        'engine_version':result['manifest']['engine_version'],
+        'fingerprint':result['fingerprint'],
+    }
+
+@app.get('/api/v2/benchmark')
+def v2_benchmark_api():
+    """Reproducible benchmark cases used by the validity page and release checks."""
+    return {
+        'engine_version':ENGINE_VERSION,
+        'pp_23c_120d':_v2_benchmark_case('PP',23.,120.,'outdoor'),
+        'iir_exact_100c_24h':_v2_benchmark_case('IIR',100.,1.,'immersion','milform64'),
+        'iir_transfer_90c_24h':_v2_benchmark_case('IIR',90.,1.,'immersion','milform64'),
+        'interpretation':('Les cas exacts/interpolés et les transferts de température sont '
+                          'séparés ; une erreur de transfert élevée élargit automatiquement la bande.'),
+    }
 
 @app.get('/api/validation/pp')
 def pp_validation_api():
