@@ -1028,9 +1028,13 @@ def evaluate_baselines(rows: list[dict]) -> dict:
         method='Importance par permutation sur le corpus complet (interprétation, pas validation)'
     if float(np.sum(weights)) <= 0:
         weights=np.ones(len(FEATURES),dtype=float)
-    total=float(np.sum(weights))
+    # SHAP can return float32 arrays on Linux. Convert before normalizing so
+    # the published shares remain platform-independent and sum exactly to 1.
+    weights=np.asarray(weights,dtype=np.float64)
+    total=float(np.sum(weights,dtype=np.float64))
     for feature,weight in sorted(zip(FEATURES,weights),key=lambda p:float(p[1]),reverse=True):
         importance.append({'feature':feature,'label':FEATURE_LABELS[feature],'importance':float(weight/total)})
+    importance[-1]['importance'] += 1.0-sum(item['importance'] for item in importance)
     return {
         'features':FEATURES,'target':'residual_property','folds':folds,
         'split':'GroupKFold par experiment_id','metrics':metrics,'best_model':best_name,
