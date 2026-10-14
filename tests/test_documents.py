@@ -24,7 +24,11 @@ def test_pdf_extraction_subprocess():
     assert result['empty_pages']==[]
     assert len(result['sha256'])==64
 
-@pytest.mark.parametrize('raw',[b'not a pdf',b'%PDF-'+b'0'*documents.MAX_BYTES,b'%PDF-broken'])
+@pytest.mark.parametrize(
+    'raw',
+    [b'not a pdf', b'%PDF-' + b'0' * documents.MAX_BYTES, b'%PDF-broken'],
+    ids=['signature-absente', 'fichier-trop-volumineux', 'pdf-invalide'],
+)
 def test_invalid_pdf(raw):
     with pytest.raises(ValueError): documents.extract_pdf(raw)
 
