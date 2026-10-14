@@ -75,4 +75,7 @@ def transfer_owner(source_owner: str, target_owner: str) -> int:
     return int(cursor.rowcount)
 
 def backup(destination):
-    with connect() as source,sqlite3.connect(destination) as target: source.backup(target)
+    source=connect(); target=sqlite3.connect(destination)
+    try: source.backup(target)
+    finally:
+        target.close(); source.close()

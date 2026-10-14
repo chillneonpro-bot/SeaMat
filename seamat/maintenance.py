@@ -27,7 +27,13 @@ def create_backup_archive(destination: str | Path, db_path: str | Path | None = 
     destination.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='seamat-backup-') as temp:
         snapshot=Path(temp)/'seamat.sqlite3'
-        with sqlite3.connect(source_db) as source,sqlite3.connect(snapshot) as target: source.backup(target)
+        source=sqlite3.connect(source_db)
+        target=sqlite3.connect(snapshot)
+        try:
+            source.backup(target)
+        finally:
+            target.close()
+            source.close()
         files={'database/seamat.sqlite3':snapshot}
         if source_docs.exists():
             for path in source_docs.rglob('*'):
@@ -59,9 +65,12 @@ def verify_backup_archive(archive_path: str | Path) -> dict:
             path=root/name
             if not path.is_file() or _sha256(path)!=expected.get('sha256') or path.stat().st_size!=expected.get('bytes'):
                 raise ValueError('Échec de vérification : '+name)
-        with sqlite3.connect(root/'database/seamat.sqlite3') as conn:
+        conn=sqlite3.connect(root/'database/seamat.sqlite3')
+        try:
             integrity=conn.execute('PRAGMA integrity_check').fetchone()[0]
             records=conn.execute('SELECT COUNT(*) FROM records').fetchone()[0]
+        finally:
+            conn.close()
         if integrity!='ok': raise ValueError('La base sauvegardée est corrompue.')
     return {'valid':True,'created_at':manifest['created_at'],'schema_version':manifest['schema_version'],
             'file_count':len(manifest['files']),'record_count':records}

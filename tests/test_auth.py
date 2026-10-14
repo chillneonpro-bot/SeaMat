@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from seamat import auth, store
@@ -40,4 +42,5 @@ def test_private_local_bootstrap_tokens(tmp_path,monkeypatch):
     assert created is True and token.startswith('ENS-')
     assert auth.server_token('SEAMAT_TEACHER_TOKEN','.teacher_token')==token
     assert auth.ensure_server_token('SEAMAT_TEACHER_TOKEN','.teacher_token','ENS')==(token,False)
-    assert (tmp_path/'.teacher_token').stat().st_mode & 0o777 == 0o600
+    if os.name!='nt':
+        assert (tmp_path/'.teacher_token').stat().st_mode & 0o777 == 0o600
