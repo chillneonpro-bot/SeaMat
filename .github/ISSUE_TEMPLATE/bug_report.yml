@@ -14,7 +14,7 @@ body:
     id: version
     attributes:
       label: Version de SeaMat
-      placeholder: "0.38.0"
+      placeholder: "3.1.0"
     validations:
       required: true
   - type: textarea
