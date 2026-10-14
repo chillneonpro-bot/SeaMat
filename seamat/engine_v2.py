@@ -328,6 +328,8 @@ def validation_metrics(predictions: list[dict], half_width: float | None=None) -
         "independent_validation_groups":len(group_names),
         "covered_validation_groups":covered_groups,
         "residuals":[float(value) for value in log_residual],
+        "predictions":predictions,
+        "validation_design":"internal_group_cross_validation",
     }
 
 
@@ -501,15 +503,19 @@ def predict_from_evidence(request: Request, rows: list[dict]) -> dict | None:
                            (metrics["max_ape_pct"] or 1e9)<=20 and
                            (coverage is None or coverage>=75))
     source_count=len({item["source_id"] for item in series})
-    if validation_passed and source_count>=2:
-        evidence_level="externally_validated_short_term"
-    elif validation_passed:
+    if validation_passed:
         evidence_level="case_calibrated_short_term"
     else:
         evidence_level="evidence_informed_short_term"
     target=request.threshold_percent/100
     crossing_horizon=max(request.horizon_days,max_time*100,36525.)
-    crossing_grid=np.linspace(0,crossing_horizon,5000)
+    # Preserve sub-day resolution inside the published window. A single linear
+    # grid out to 100 years skipped the first 7 days and could therefore report
+    # a threshold after the observation that had already crossed it.
+    observed_grid=np.linspace(0,max_time,max(1001,int(max_time*240)+1))
+    extrapolated_grid=(np.geomspace(max_time*(1+1e-9),crossing_horizon,5000)
+                       if crossing_horizon>max_time else np.asarray([],dtype=float))
+    crossing_grid=np.unique(np.r_[observed_grid,extrapolated_grid])
     crossing_center=central_at(crossing_grid)
     crossing_extra=np.maximum(crossing_grid/max_time-1,0)
     crossing_half=base_half+.06*np.log1p(crossing_extra)
@@ -520,12 +526,12 @@ def predict_from_evidence(request: Request, rows: list[dict]) -> dict | None:
     slow_cross=_crossing(crossing_grid,crossing_center*np.exp(crossing_half),target)
     match=_match_score(request,series,profile["route"],horizon_ratio)
     uncertainty={
-        "kind":"calibrated_log_conformal" if holdouts else "reported_sd_plus_model_floor",
-        "label":f"Bande prédictive {int(TARGET_COVERAGE*100)} % calibrée" if holdouts else "Bande issue de la dispersion publiée",
+        "kind":"empirical_group_residuals" if holdouts else "reported_sd_plus_model_floor",
+        "label":"Bande empirique interne · couverture externe non établie" if holdouts else "Bande issue de la dispersion publiée",
         "coverage":(f"{coverage:.1f} % observés sur {metrics['test_predictions']} prédictions masquées"
                     if coverage is not None else "couverture externe non mesurable"),
-        "interpretation":"Quantile conforme des erreurs logarithmiques hors échantillon, dispersion publiée et pénalité d’extrapolation.",
-        "predictive_interval_validated":validation_passed and horizon_ratio<=1,"display_band":True,
+        "interpretation":"Quantile empirique des erreurs de validation croisée, dispersion publiée et pénalité d’extrapolation ; calibration externe nécessaire.",
+        "predictive_interval_validated":False,"display_band":True,
         "base_half_width_pct":float((math.exp(base_half)-1)*100),
         "target_coverage_pct":TARGET_COVERAGE*100,
         "calibration":metrics,
@@ -601,6 +607,9 @@ def predict_from_evidence(request: Request, rows: list[dict]) -> dict | None:
         "fraction_crossing":float(central_cross is not None and central_cross<=request.horizon_days),
         "rate":float(-math.log(max(central[-1],MIN_RETENTION))/max(request.horizon_days,1e-12)),
         "manifest":manifest,"fingerprint":fingerprint,"pending":False,
+        # Keep the accepted rows used by the routed profile so Excel/PDF/JSON
+        # exports can be audited without reopening the internal database.
+        "observed_points":[dict(row) for item in profile["series"] for row in item["rows"]],
     }
     return result
 

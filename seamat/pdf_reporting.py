@@ -91,7 +91,10 @@ def result_pdf(result: dict, title: str='Rapport SeaMat') -> bytes:
     for check in diagnostic['checks']:
         y=_text(pdf,f"{check['criterion']} : {check['finding']}",52,y,492,size=8)
     y=_text(pdf,'Expérience recommandée : '+diagnostic['recommended_experiment'],46,y-3,500,size=8,color=colors.HexColor('#7A4E00'))
-    _footer(pdf,1); pdf.showPage(); y=height-45
+    precision=manifest.get('precision') or {}
+    physics=manifest.get('family_physics') or {}
+    total_pages=2+bool(precision)+bool(physics)
+    _footer(pdf,1,total_pages); pdf.showPage(); y=height-45
     y=_section(pdf,'Paramètres d’origine',y)
     for key,value in inputs.items():
         y=_text(pdf,f'{key} : {value}',46,y,500,size=8)
@@ -107,7 +110,37 @@ def result_pdf(result: dict, title: str='Rapport SeaMat') -> bytes:
         y=_text(pdf,f"{item['component']} - {item['value']} : {item['meaning']}",46,y,500,size=8)
     for warning in manifest.get('warnings',[]):
         y=_text(pdf,'Limite : '+str(warning),46,y,500,size=8,color=colors.HexColor('#7A4E00'))
-    _footer(pdf,2)
+    _footer(pdf,2,total_pages)
+    if precision:
+        pdf.showPage(); y=height-45
+        y=_section(pdf,'Précision et paramètres du matériau',y)
+        measured=precision.get('reference_precision_pct')
+        value=f"{measured:.1f} %" if measured is not None else 'Non mesurée'
+        y=_text(pdf,f"Sur les références : {value} à ±{precision['tolerance_pct']:g} % ; {precision['success_count']}/{precision['prediction_count']} valeurs masquées, {precision['group_count']} groupes.",46,y,500,bold=True)
+        y=_text(pdf,'Votre grade : '+precision['target_status'],46,y,500,bold=True)
+        y=_text(pdf,precision['scope'],46,y,500,size=8)
+        y=_text(pdf,f"Description renseignée : {precision['completeness_pct']} %. Ce score n’est pas une précision.",46,y,500,size=8)
+        y=_text(pdf,(manifest.get('hybrid_engine') or {}).get('reason',''),46,y,500,size=8)
+        y=_section(pdf,'Applicabilité de la précision',y-10)
+        for check in precision['domain_checks']:
+            y=_text(pdf,f"{check['parameter']} : {check['status']}. {check['detail']}",46,y,500,size=8)
+        y=_section(pdf,'Propriétés fournies',y-10)
+        for descriptor in precision['descriptors']:
+            value=descriptor['value'] if descriptor['value'] is not None else 'Non renseigné'
+            y=_text(pdf,f"{descriptor['parameter']} : {value} ; {descriptor['status']}",46,y,500,size=8)
+        _footer(pdf,3,total_pages)
+    if physics:
+        from seamat.family_physics import PARAMETERS,MECHANISMS
+        pdf.showPage(); y=height-45
+        y=_section(pdf,'Modèle par mécanismes',y)
+        y=_text(pdf,physics['family']['label']+' : '+', '.join(MECHANISMS[k] for k in physics['mechanisms']),46,y,500,bold=True)
+        y=_text(pdf,'Coefficients déclarés : '+physics['source'],46,y,500,size=8)
+        y=_text(pdf,'Formule : '+physics['formula'],46,y,500,size=8)
+        y=_text(pdf,'Précision expérimentale non établie. Les bornes éventuelles décrivent des scénarios, pas une couverture statistique.',46,y,500,size=8)
+        for key,value in physics['parameters'].items():
+            bounds=physics['bounds'].get(key)
+            y=_text(pdf,f'{PARAMETERS[key][0]} : {value:g}'+(f' ; bornes {bounds[0]} à {bounds[1]}' if bounds else ''),46,y,500,size=8)
+        _footer(pdf,total_pages,total_pages)
     pdf.save(); return output.getvalue()
 
 

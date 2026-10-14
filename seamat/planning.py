@@ -11,7 +11,7 @@ import xlsxwriter
 
 def _curve_days(result: dict) -> np.ndarray:
     manifest=result.get('manifest') or {}; model=str(manifest.get('model',''))
-    factor=365.25 if model.startswith('datasheet-screening-') else 1.
+    factor=365.25 if model.startswith(('datasheet-screening-', 'datasheet-analog-')) else 1.
     times=np.asarray(result.get('time') or [],dtype=float)*factor
     if len(times)<2 or abs(float(times[0]))>1e-9 or np.any(np.diff(times)<=0):
         raise ValueError('La projection doit contenir une courbe temporelle croissante partant de zéro.')
@@ -36,10 +36,10 @@ def _validated_series(result: dict, times: np.ndarray) -> tuple[np.ndarray,np.nd
 
 def _crossing_day(result: dict) -> float | None:
     manifest=result.get('manifest') or {}; model=str(manifest.get('model',''))
-    value=result.get('crossing_estimate_years') if model.startswith('datasheet-screening-') else result.get('crossing')
+    value=result.get('crossing_estimate_years') if model.startswith(('datasheet-screening-', 'datasheet-analog-')) else result.get('crossing')
     if value is None:
         return None
-    return float(value)*(365.25 if model.startswith('datasheet-screening-') else 1.)
+    return float(value)*(365.25 if model.startswith(('datasheet-screening-', 'datasheet-analog-')) else 1.)
 
 
 def _unique_times(values: list[float], horizon: float) -> list[float]:

@@ -58,13 +58,13 @@ def result_csv(result: dict) -> bytes:
     out=io.StringIO(); w=csv.writer(out)
     manifest=result.get('manifest',{}); model=str(manifest.get('model',VERSION))
     times=result['time']
-    if model.startswith('datasheet-screening-'):
+    if model.startswith(('datasheet-screening-', 'datasheet-analog-')):
         unit=manifest.get('inputs',{}).get('horizon_display',{}).get('unit','years')
         factor={'days':365.25,'months':12.,'years':1.}.get(unit,1.)
         times=[value*factor for value in times]; time_column=f'time_{unit}'
     else: time_column='time_days'
     status=manifest.get('status','SYNTHETIC_NOT_VALIDATED')
-    status_code=('EXPLORATORY_PROJECTION' if model.startswith('datasheet-screening-')
+    status_code=('EXPLORATORY_PROJECTION' if model.startswith(('datasheet-screening-', 'datasheet-analog-'))
                  else 'PUBLISHED_OBSERVATION' if model.startswith('piecewise-linear-published-')
                  else 'ACCEPTED_OBSERVATION' if model.startswith('piecewise-linear-observed-')
                  else 'SYNTHETIC_NOT_VALIDATED')
@@ -79,7 +79,7 @@ def comparison_csv(results: list[tuple[str,dict]]) -> bytes:
     w.writerow(['scenario','time','time_unit','modulus_MPa','lower_MPa','upper_MPa','retention_percent','status','model_version','fingerprint'])
     for name,result in results:
         manifest=result.get('manifest',{}); model=str(manifest.get('model',VERSION))
-        if model.startswith('datasheet-screening-'):
+        if model.startswith(('datasheet-screening-', 'datasheet-analog-')):
             unit=manifest.get('inputs',{}).get('horizon_display',{}).get('unit','years')
             factor={'days':365.25,'months':12.,'years':1.}.get(unit,1.); times=[value*factor for value in result['time']]
         else: unit='days'; times=result['time']

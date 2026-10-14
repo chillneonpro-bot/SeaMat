@@ -414,7 +414,7 @@ def uncertainty_budget(result: dict) -> list[dict]:
                  'quantified':shown is not None and not standardized,
                  'meaning':('Convention de sensibilité non statistique ; elle ne constitue pas une incertitude prédictive.'
                             if standardized else uncertainty.get('interpretation','Bande liée aux données et à la validation disponibles.'))})
-    if model.startswith('datasheet-screening-'):
+    if model.startswith(('datasheet-screening-', 'datasheet-analog-')):
         assumptions=manifest.get('assumptions',{}); multiple=assumptions.get('extrapolation_multiple')
         rows.append({'component':'Extrapolation temporelle','value':f'× {multiple:.1f} la durée observée' if _finite(multiple) else 'Non quantifiée',
                      'quantified':_finite(multiple),'meaning':'Cette composante n’est pas incluse dans un intervalle statistique validé.'})
@@ -451,7 +451,7 @@ def validity_diagnostic(result: dict) -> dict:
         level='Corpus accepté limité' if accepted else 'Aperçu non validé'
         conclusion='Interpolation utilisable pour l’enseignement dans le domaine observé.' if accepted else 'Ce résultat ne peut pas servir de preuve.'
         recommendation='Ajouter une campagne indépendante et les données brutes par éprouvette.'
-    elif model.startswith('datasheet-screening-'):
+    elif model.startswith(('datasheet-screening-', 'datasheet-analog-')):
         reliability=manifest.get('reliability') or {}
         calibrated=manifest.get('evidence_level') in {'externally_validated_short_term','case_calibrated_short_term','calibrated_short_term','evidence_informed_short_term'}
         multiple=(manifest.get('assumptions') or {}).get('extrapolation_multiple')

@@ -10,7 +10,7 @@ def curve(result, threshold=None, band_mode='central'):
     model=result.get('manifest',{}).get('model','')
     observed=model in {'piecewise-linear-observed-v1','piecewise-linear-published-v1'}
     published=model=='piecewise-linear-published-v1'
-    datasheet=model.startswith('datasheet-screening-')
+    datasheet=model.startswith(('datasheet-screening-', 'datasheet-analog-'))
     calibrated=datasheet and result.get('manifest',{}).get('assumptions',{}).get('evidence_calibrated')
     uncertainty_label=result.get('manifest',{}).get('uncertainty',{}).get('label')
     if datasheet:
@@ -39,6 +39,12 @@ def curve(result, threshold=None, band_mode='central'):
         f.add_trace(go.Scatter(x=t,y=band_lower,mode='lines',line=dict(width=0),fill='tonexty',fillcolor='rgba(33,86,188,.12)',name=band_name or ('Écart-type publié' if published else 'Incertitude de numérisation' if observed else 'Dispersion inter-formulations' if calibrated else 'Sensibilité 5–95 % (synthétique)'),hoverinfo='skip',connectgaps=False))
     extrapolated=bool(calibrated and result.get('manifest',{}).get('assumptions',{}).get('extrapolation_multiple',0)>1)
     f.add_trace(go.Scatter(x=t,y=result['modulus'],mode='lines',name='Interpolation des mesures publiées' if published else 'Interpolation des observations' if observed else 'Profil documentaire central puis extrapolation' if extrapolated else 'Profil documentaire central' if calibrated else 'Estimation centrale de présélection' if datasheet else 'Scénario synthétique',line=dict(color=COLORS[0],width=3),hovertemplate='%{y:.0f} MPa'))
+    if result.get('manifest',{}).get('family_physics',{}).get('active'):
+        f.data[-1].name='Modèle par mécanismes · coefficients fournis'
+    elif result.get('manifest',{}).get('hybrid_engine',{}).get('active'):
+        f.data[-1].name='Cinétique environnementale apprise' + (' · extrapolation' if extrapolated else '')
+    elif model.startswith('datasheet-analog-'):
+        f.data[-1].name='Estimation par transfert depuis un analogue'
     if observed and result.get('observed_points'):
         f.add_trace(go.Scatter(x=[p['time_days'] for p in result['observed_points']],y=[p.get('modulus_MPa',p.get('modulus_mpa')) for p in result['observed_points']],mode='markers',name='Points publiés',marker=dict(size=8,color='#13958b')))
     if threshold is not None: f.add_hline(y=threshold,line_dash='dash',line_color='#b9782d',annotation_text='Seuil choisi',annotation_position='bottom right')
@@ -49,7 +55,7 @@ def curve(result, threshold=None, band_mode='central'):
 def _comparison_time_days(result):
     """Return every supported result on one physical time axis."""
     model=str(result.get('manifest',{}).get('model',''))
-    factor=365.25 if model.startswith('datasheet-screening-') else 1.
+    factor=365.25 if model.startswith(('datasheet-screening-', 'datasheet-analog-')) else 1.
     return [float(value)*factor for value in result['time']]
 
 

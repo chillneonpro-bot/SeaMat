@@ -33,8 +33,9 @@ def test_pp_is_internal_only_inside_its_published_window():
     assert claim['confidence_level_pct']==95
     assert claim['qualified'] is False
     assert claim['independent_groups']==4
-    assert claim['one_sided_lower_bound_pct']<95
-    assert claim['additional_groups_best_case']==55
+    assert claim['one_sided_lower_bound_pct'] is None
+    assert claim['additional_groups_best_case'] is None
+    assert claim['external_test_eligible'] is False
     assert outside['manifest']['reliability']['code']=='extrapolation_unqualified'
     assert outside['manifest']['reliability']['usable_for_screening'] is False
 
@@ -65,7 +66,10 @@ def test_95_95_claim_requires_59_fully_covered_independent_groups():
         return {'manifest':{'model':'datasheet-screening-v6-seamat-engine','assumptions':{
             'extrapolation_multiple':1,'profile_method':'experiment_transfer',
             'independent_sources':2,'documentary_match':{'score':90},
-            'validation':{'test_predictions':groups,'mape_pct':3,'max_ape_pct':5,
+            'validation':{'validation_design':'frozen_external_test',
+                          'model_frozen_before_test':True,'interval_frozen_before_test':True,
+                          'independence_reviewed':True,
+                          'test_predictions':groups,'mape_pct':3,'max_ape_pct':5,
                           'empirical_point_coverage_pct':100,
                           'independent_validation_groups':groups,
                           'covered_validation_groups':groups}}}}

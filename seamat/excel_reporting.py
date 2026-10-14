@@ -102,7 +102,7 @@ def _display_axis(result: dict) -> tuple[list[float], str, float]:
     manifest = result.get("manifest", {})
     model = str(manifest.get("model", ""))
     times = [float(v) for v in result.get("time", [])]
-    if model.startswith("datasheet-screening-"):
+    if model.startswith(("datasheet-screening-", "datasheet-analog-")):
         unit = manifest.get("inputs", {}).get("horizon_display", {}).get("unit", "years")
         if unit == "days":
             return [v * 365.25 for v in times], "jours", 1.0
@@ -115,7 +115,7 @@ def _display_axis(result: dict) -> tuple[list[float], str, float]:
 def _time_days(result: dict) -> list[float]:
     manifest = result.get("manifest", {})
     model = str(manifest.get("model", ""))
-    factor = 365.25 if model.startswith("datasheet-screening-") else 1.0
+    factor = 365.25 if model.startswith(("datasheet-screening-", "datasheet-analog-")) else 1.0
     return [float(v) * factor for v in result.get("time", [])]
 
 
@@ -128,11 +128,11 @@ def _material_name(result: dict) -> str:
 def _crossing_text(result: dict) -> str:
     manifest = result.get("manifest", {})
     model = str(manifest.get("model", ""))
-    value = result.get("crossing_estimate_years") if model.startswith("datasheet-screening-") else result.get("crossing")
+    value = result.get("crossing_estimate_years") if model.startswith(("datasheet-screening-", "datasheet-analog-")) else result.get("crossing")
     if value is None:
         return "Non atteint"
     value = float(value)
-    if model.startswith("datasheet-screening-"):
+    if model.startswith(("datasheet-screening-", "datasheet-analog-")):
         months = int(round(value * 12))
         years, remaining = divmod(months, 12)
         parts = []
@@ -243,6 +243,32 @@ def result_workbook(result: dict, title: str = "Résultat SeaMat") -> bytes:
         row = _write_pair(summary, fmt, row, "Qualification", reliability.get("label", "Non évaluée"), end_col=9, value_format=fmt["status"])
         row = _write_pair(summary, fmt, row, "Décision d'usage", reliability.get("decision", "Non évaluée"), end_col=9)
     row = _write_pair(summary, fmt, row, "Modèle", manifest.get("model", "Non renseigné"), end_col=9)
+    precision = manifest.get('precision') or {}
+    if precision:
+        measured = precision.get('reference_precision_pct')
+        text = (f"{measured:.1f} % dans ±{precision['tolerance_pct']:g} % · "
+                f"{precision['success_count']}/{precision['prediction_count']} valeurs masquées") if measured is not None else 'Non mesurée'
+        row = _write_pair(summary, fmt, row, 'Précision sur références', text, end_col=9)
+        row = _write_pair(summary, fmt, row, 'Votre grade', precision['target_status'], end_col=9)
+        row = _write_pair(summary, fmt, row, 'Portée', precision['scope'], end_col=9)
+        quality = workbook.add_worksheet('Précision et paramètres')
+        _prepare_sheet(quality, TEAL)
+        _write_title(quality, fmt, 'Précision et paramètres', precision['definition'])
+        qrow = _write_pair(quality, fmt, 3, 'Description renseignée', f"{precision['completeness_pct']} % · ce score n’est pas une précision")
+        qrow = _write_pair(quality, fmt, qrow, 'Moteur environnemental', (manifest.get('hybrid_engine') or {}).get('reason', 'Non évalué'))
+        qrow = _section(quality, fmt, qrow + 1, 'Applicabilité au matériau')
+        for check in precision['domain_checks']:
+            qrow = _write_pair(quality, fmt, qrow, check['parameter'], check['status'] + ' · ' + check['detail'])
+        qrow = _section(quality, fmt, qrow + 1, 'Propriétés fournies')
+        for descriptor in precision['descriptors']:
+            qrow = _write_pair(quality, fmt, qrow, descriptor['parameter'], f"{descriptor['value'] if descriptor['value'] is not None else 'Non renseigné'} · {descriptor['status']}")
+        qrow = _section(quality, fmt, qrow + 1, 'Prédictions masquées · E/E₀')
+        headers = ['Groupe', 'Temps (jours)', 'Observé', 'Prédit', 'Erreur relative (%)', 'Dans la tolérance']
+        quality.write_row(qrow, 0, headers, fmt['key'])
+        for point in precision['predictions']:
+            qrow += 1
+            quality.write_row(qrow, 0, [_safe(point['group']), point['time_days'], point['observed_retention'], point['predicted_retention'], point['relative_error_pct'], 'Oui' if point['within_tolerance'] else 'Non'])
+        quality.freeze_panes(3, 0)
     row = _write_pair(summary, fmt, row, "Moteur de calcul", manifest.get("engine_version", "Non renseigné"), end_col=9)
     row = _write_pair(summary, fmt, row, "Empreinte du calcul", result.get("fingerprint", "Non renseigné"), end_col=9)
     summary.freeze_panes(3, 0)
@@ -396,6 +422,23 @@ def result_workbook(result: dict, title: str = "Résultat SeaMat") -> bytes:
     row = _write_pair(details, fmt, row, "Jeu de données", manifest.get("dataset", "Non renseigné"))
     _write_pair(details, fmt, row, "Empreinte SHA-256", result.get("fingerprint", "Non renseigné"))
     details.freeze_panes(3, 0)
+
+    physics=manifest.get('family_physics') or {}
+    if physics:
+        from seamat.family_physics import PARAMETERS,MECHANISMS
+        sheet=workbook.add_worksheet('Mécanismes et coefficients')
+        _prepare_sheet(sheet,TEAL)
+        _write_title(sheet,fmt,'Modèle par mécanismes','Coefficients déclarés · précision expérimentale non établie')
+        r=_write_pair(sheet,fmt,3,'Famille',physics['family']['label'])
+        r=_write_pair(sheet,fmt,r,'Mécanismes',', '.join(MECHANISMS[k] for k in physics['mechanisms']))
+        r=_write_pair(sheet,fmt,r,'Source des coefficients',physics['source'])
+        r=_write_pair(sheet,fmt,r,'Formule',physics['formula'])
+        for key,value in physics['parameters'].items():
+            interval=physics['bounds'].get(key)
+            r=_write_pair(sheet,fmt,r,PARAMETERS[key][0],f'{value:g}'+(f' ; bornes {interval[0]} à {interval[1]}' if interval else ''))
+        for reference in physics['references']:
+            r=_write_pair(sheet,fmt,r,reference['title'],reference['url']+' · '+reference['scope'])
+        sheet.freeze_panes(3,0)
 
     if observations:
         _write_title(observations, fmt, "Mesures source", "Valeurs d'origine conservées séparément de l'interpolation")

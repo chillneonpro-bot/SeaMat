@@ -73,13 +73,14 @@ def _coverage_95_claim(validation: dict, sources: int) -> dict:
     the engine exposes them.  A group passes only if all its hidden points are
     covered, preventing many correlated time points from inflating confidence.
     """
-    point_count=int(validation.get("test_predictions") or 0)
     groups=int(validation.get("independent_validation_groups") or 0)
     covered_groups=int(validation.get("covered_validation_groups") or 0)
-    if groups<=0:
-        coverage=_number(validation.get("empirical_point_coverage_pct"))
-        groups=point_count
-        covered_groups=(int(round(groups*(coverage or 0)/100)) if coverage is not None else 0)
+    external=bool(validation.get('validation_design')=='frozen_external_test'
+                  and validation.get('model_frozen_before_test') is True
+                  and validation.get('interval_frozen_before_test') is True
+                  and validation.get('independence_reviewed') is True)
+    if not 0<=covered_groups<=groups:
+        groups=covered_groups=0
     if groups<=0 or covered_groups<=0:
         lower=0.
     else:
@@ -92,21 +93,22 @@ def _coverage_95_claim(validation: dict, sources: int) -> dict:
         bound=(float(beta.ppf(.05,successes,total-successes+1)*100) if successes else 0.)
         if bound>=TARGET_RELIABILITY_PCT:
             required_total=total; break
-    qualified=bool(lower>=TARGET_RELIABILITY_PCT and sources>=MIN_EXTERNAL_SOURCES)
+    qualified=bool(external and lower>=TARGET_RELIABILITY_PCT and sources>=MIN_EXTERNAL_SOURCES)
     return {
         "target_coverage_pct":TARGET_RELIABILITY_PCT,
         "confidence_level_pct":TARGET_CONFIDENCE_PCT,
         "validation_unit":"groupe indépendant entièrement masqué",
         "independent_groups":groups,"covered_groups":covered_groups,
         "observed_group_coverage_pct":float(covered_groups/groups*100) if groups else None,
-        "one_sided_lower_bound_pct":lower,
+        "one_sided_lower_bound_pct":lower if external else None,
+        "external_test_eligible":external,
         "minimum_external_sources":MIN_EXTERNAL_SOURCES,"observed_sources":sources,
-        "required_total_groups_best_case":required_total,
-        "additional_groups_best_case":(required_total-groups if required_total is not None else None),
+        "required_total_groups_best_case":required_total if external else None,
+        "additional_groups_best_case":(required_total-groups if external and required_total is not None else None),
         "qualified":qualified,
         "decision":("Objectif 95/95 démontré dans le domaine testé."
                     if qualified else
-                    "Objectif 95/95 non démontré : la précision observée ne suffit pas sans assez de groupes externes."),
+                    "Objectif 95/95 non démontré : un test externe indépendant après gel du modèle et des bornes est requis."),
     }
 def assess_result(result: dict) -> dict:
     """Classify a result with one rule set shared by every material."""
@@ -124,8 +126,19 @@ def assess_result(result: dict) -> dict:
     match_score=int(match.get("score") or 0)
     engine_backed=model=="datasheet-screening-v6-seamat-engine"
     analog=assumptions.get("analog_transfer") or {}
+    if analog or not in_time_domain or match_score<80:
+        claim_95['qualified']=False
+        claim_95['decision']='Qualification externe non transférable à ce grade ou à ces conditions.'
 
-    if analog:
+    if manifest.get('family_physics',{}).get('active'):
+        decision=ReliabilityDecision(
+            code='parameterised_research_model',label='Modèle par mécanismes · à valider',tone='amber',
+            usable_for_screening=False,qualified_external=False,
+            decision='La courbe calcule les mécanismes choisis avec les coefficients fournis ; sa précision doit être mesurée sur des essais indépendants.',
+            scope='Prédiction de recherche à figer avant expérimentation.',
+            reasons=['coefficients explicitement fournis','aucune validation externe attachée à cette combinaison'],
+            next_actions=['vérifier les références et le domaine des coefficients','comparer le modèle figé aux essais indépendants'])
+    elif analog:
         analog_score=int(analog.get("similarity_score") or 0)
         analog_minimum=int(analog.get("minimum_score") or 85)
         if not in_time_domain:

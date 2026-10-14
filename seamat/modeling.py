@@ -343,8 +343,17 @@ def estimate_from_datasheet(material: dict, modulus_mpa: float, temperature_c: f
                             evidence_rows: list[dict] | None = None,
                             immersion_medium: str | None = None,
                             grade_reference: str | None = None,
-                            process_state: str | None = None) -> dict:
+                            process_state: str | None = None,
+                            precision_tolerance_pct: float = 5.) -> dict:
     """Engineering screening curve from a datasheet modulus and transparent family factors."""
+    from seamat.prediction_quality import finalize_prediction
+    from seamat.hybrid_engine import validate_descriptors
+    validate_descriptors(material)
+    if (material.get('physics_model') or {}).get('enabled'):
+        from seamat.family_physics import validate_config
+        validate_config(material['physics_model'])
+    def finish(result):
+        return finalize_prediction(result,material,compatible_rows,precision_tolerance_pct)
     values=[modulus_mpa,temperature_c,humidity_rh,thickness_mm,horizon_years,threshold_percent]
     if not np.all(np.isfinite(values)) or modulus_mpa<=0 or thickness_mm<=0 or horizon_years<=0:
         raise ValueError('Les paramètres doivent être finis et strictement positifs.')
@@ -386,8 +395,7 @@ def estimate_from_datasheet(material: dict, modulus_mpa: float, temperature_c: f
             process_state=(process_state or '').strip() or None,
         ),compatible_rows)
         if routed is not None:
-            from seamat.reliability import apply_reliability_gate
-            return apply_reliability_gate(routed)
+            return finish(routed)
     if material.get('custom'):
         # A material entered by a user has no time series of its own.  Try a
         # strict, auditable transfer from a reviewed analogue before falling
@@ -399,8 +407,7 @@ def estimate_from_datasheet(material: dict, modulus_mpa: float, temperature_c: f
             exposure,immersion_medium,grade_reference,process_state,
         )
         if routed is not None:
-            from seamat.reliability import apply_reliability_gate
-            return apply_reliability_gate(routed)
+            return finish(routed)
         analogs=rank_analogs({**material,
                               'grade_reference':grade_reference or material.get('grade_reference'),
                               'process_state':process_state or material.get('process_state')},exposure)
@@ -644,8 +651,7 @@ def estimate_from_datasheet(material: dict, modulus_mpa: float, temperature_c: f
             'crossing_estimate_years':crossing,'crossing_interval':[low_cross,high_cross],
             'fraction_crossing':float(crossing is not None and crossing<=horizon_years),'rate':rate,'manifest':manifest,
             'fingerprint':fingerprint,'pending':False}
-    from seamat.reliability import apply_reliability_gate
-    return apply_reliability_gate(result)
+    return finish(result)
 
 def evidence_assessment(result: dict) -> dict:
     """Return a student-readable assessment without inventing a precision score."""
@@ -717,7 +723,7 @@ def sampled_curve_rows(result: dict, count: int = 9, time_unit: str | None = Non
     """Create an accessible, compact data table from a plotted curve."""
     times=np.asarray(result['time'],dtype=float)
     model=str(result.get('manifest',{}).get('model',''))
-    if time_unit is None and model.startswith('datasheet-screening-'):
+    if time_unit is None and model.startswith(('datasheet-screening-', 'datasheet-analog-')):
         unit=result.get('manifest',{}).get('inputs',{}).get('horizon_display',{}).get('unit','years')
         factor={'days':365.25,'months':12.,'years':1.}.get(unit,1.)
         times=times*factor; time_unit={'days':'jours','months':'mois','years':'années'}.get(unit,'années')
@@ -746,7 +752,15 @@ def curve_value_origins(result: dict) -> list[str]:
     manifest=result.get('manifest') or {}
     model=str(manifest.get('model',''))
     assumptions=manifest.get('assumptions') or {}
-    if model.startswith('datasheet-screening-'):
+    if manifest.get('family_physics',{}).get('active'):
+        return ['Modèle par mécanismes']*len(times)
+    if assumptions.get('analog_transfer'):
+        limit_days=float(assumptions.get('evidence_window_days') or 0)
+        return ['Extrapolé depuis un analogue' if value*365.25>limit_days+1e-9 else 'Transféré depuis un analogue' for value in times]
+    if assumptions.get('profile_method')=='learned_environment_kinetics':
+        limit_days=float(assumptions.get('evidence_window_days') or 0)
+        return ['Extrapolé' if value*365.25>limit_days+1e-9 else 'Loi environnementale apprise' for value in times]
+    if model.startswith(('datasheet-screening-', 'datasheet-analog-')):
         if assumptions.get('evidence_calibrated'):
             limit_days=float(assumptions.get('evidence_window_days') or 0)
             return ['Extrapolé' if limit_days and value*365.25>limit_days+1e-9 else 'Interpolé'

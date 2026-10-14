@@ -31,6 +31,9 @@ from seamat.engine_v2 import (ENGINE_VERSION, Request, capability_summary,
                               predict_from_evidence)
 from seamat.reliability import GATE_VERSION, material_coverage, apply_reliability_gate
 from seamat.analog_model import rank_analogs, MIN_ANALOG_SCORE
+from seamat.hybrid_engine import DESCRIPTORS, validate_descriptors
+from seamat.family_physics import PARAMETERS, MECHANISMS, family_plan, validate_config
+from seamat.real_data_audit import real_data_audit
 import plotly.graph_objects as go
 
 ROOT=Path(__file__).parent
@@ -40,6 +43,57 @@ RESOURCE_NAV=[('/materiaux','Matériaux','category'),('/validite','Validité','v
 SPACE_NAV=[('/classe','Espace classe','groups'),('/connexion','Mon compte','account_circle')]
 
 ROLE_LABELS={'student':'Étudiant','teacher':'Enseignant','admin':'Administrateur'}
+
+def physics_editor(initial=None,material_getter=None):
+    initial=initial or {}
+    controls={}; bounds={}; fields={}
+    with ui.expansion('Modèle par mécanismes · coefficients documentés',icon='functions').classes('w-full'):
+        with ui.column().classes('w-full p-3 gap-3'):
+            ui.label('Utiliser des coefficients de littérature ou de caractérisation pour calculer la courbe. Les propriétés statiques seules ne fournissent pas ces vitesses.').classes('field-help')
+            enabled=ui.switch('Activer ce modèle',value=bool(initial.get('enabled')))
+            selection=ui.select(MECHANISMS,multiple=True,value=initial.get('mechanisms',[]),label='Mécanismes à calculer').props('outlined use-chips').classes('w-full')
+            if material_getter:
+                def suggest():
+                    plan=family_plan(material_getter())
+                    selection.value=plan['candidate_mechanisms']
+                    ui.notify('Mécanismes candidats sélectionnés : vérifier leur présence dans votre grade et renseigner leurs coefficients.')
+                ui.button('Suggérer selon la famille',icon='category',on_click=suggest).props('flat')
+            source=ui.input('Référence des coefficients / hypothèse déclarée',value=initial.get('source','')).props('outlined').classes('w-full')
+            for key,(label,low,high,group) in PARAMETERS.items():
+                with ui.column().classes('w-full gap-1') as field:
+                    controls[key]=ui.number(label,value=(initial.get('parameters') or {}).get(key),min=low,max=high).props('outlined clearable').classes('w-full')
+                    with ui.expansion('Bornes connues de ce coefficient',icon='unfold_more').classes('w-full'):
+                        b=(initial.get('bounds') or {}).get(key,[None,None])
+                        with ui.row().classes('w-full gap-2'):
+                            lo=ui.number('Minimum',value=b[0],min=low,max=high).props('outlined clearable').classes('grow')
+                            hi=ui.number('Maximum',value=b[1],min=low,max=high).props('outlined clearable').classes('grow')
+                        bounds[key]=(lo,hi)
+                fields[key]=(field,group)
+            ui.label('Plaque initialement sèche, conditions constantes. En immersion, le module eau exige le milieu Eau. Une énergie d’activation est requise pour transférer un coefficient à une autre température.').classes('field-help')
+    def visibility():
+        selected=set(selection.value or [])
+        for key,(field,group) in fields.items():
+            show=group=='common' or group in selected or (group=='water' and bool(selected&{'hydrolysis','plasticization'}))
+            field.set_visibility(bool(enabled.value and show))
+    def read():
+        selected=list(selection.value or [])
+        relevant={key for key,(_,_,_,group) in PARAMETERS.items() if group=='common' or group in selected or (group=='water' and set(selected)&{'hydrolysis','plasticization'})}
+        ranges={}
+        for key,(lo,hi) in bounds.items():
+            if key not in relevant: continue
+            if lo.value is not None or hi.value is not None: ranges[key]=[lo.value,hi.value]
+        config={'enabled':bool(enabled.value),'mechanisms':selected,'source':source.value or '',
+                'parameters':{key:c.value for key,c in controls.items() if key in relevant and c.value is not None},'bounds':ranges}
+        if config['enabled']: validate_config(config)
+        return config
+    def load(config):
+        config=config or {}; enabled.value=bool(config.get('enabled')); selection.value=config.get('mechanisms',[]); source.value=config.get('source','')
+        for key,c in controls.items():
+            c.value=(config.get('parameters') or {}).get(key)
+            b=(config.get('bounds') or {}).get(key,[None,None]); bounds[key][0].value=b[0]; bounds[key][1].value=b[1]
+        visibility()
+    selection.on_value_change(visibility); enabled.on_value_change(visibility); visibility()
+    return read,load
 
 def session_owner() -> str:
     if 'owner' not in app.storage.user:
@@ -259,12 +313,20 @@ def materials():
                     custom_morphology=ui.select(['Semi-cristallin','Amorphe','Réticulé','Inconnu'],value='Inconnu',label='Morphologie').props('outlined').classes('grow min-w-48')
                 with ui.row().classes('w-full gap-3 flex-wrap'):
                     custom_reinforcement=ui.input('Renfort / charge',placeholder='Aucun, fibres de verre, talc…').props('outlined').classes('grow min-w-56')
-                    custom_reinforcement_pct=ui.number('Taux de renfort (%)',min=0,max=100,value=0).props('outlined').classes('min-w-48')
-                    custom_recycled_pct=ui.number('Contenu recyclé (%)',min=0,max=100,value=0).props('outlined').classes('min-w-48')
+                    custom_reinforcement_pct=ui.number('Taux de renfort (%)',min=0,max=100,value=None).props('outlined').classes('min-w-48')
+                    custom_recycled_pct=ui.number('Contenu recyclé (%)',min=0,max=100,value=None).props('outlined').classes('min-w-48')
                 with ui.row().classes('w-full gap-3 flex-wrap'):
                     custom_stabilizers=ui.input('Additifs / stabilisants',placeholder='Anti-UV, antioxydant, non connu…').props('outlined').classes('grow min-w-64')
                     custom_exposure=ui.select({'indoor':'Intérieur / abrité','outdoor':'Extérieur / UV','immersion':'Immersion'},value='outdoor',label='Milieu visé').props('outlined').classes('min-w-56')
                 custom_reference=ui.input('Référence exacte de la fiche ou du grade',placeholder='Fabricant, grade, lot, URL ou document interne').props('outlined').classes('w-full')
+                custom_descriptors={}
+                with ui.expansion('Propriétés thermiques et structure',icon='science').classes('w-full'):
+                    with ui.row().classes('w-full p-3 gap-3 flex-wrap'):
+                        for key,(label,low,high) in DESCRIPTORS.items():
+                            if key in {'reinforcement_pct','recycled_content_pct'}: continue
+                            custom_descriptors[key]=ui.number(label,value=None,min=low,max=high).props('outlined clearable').classes('grow min-w-48')
+                    ui.label('Laisser vide si inconnu. Une propriété renseignée devient un facteur de calcul seulement si son effet est appris ou documenté.').classes('small p-3')
+                custom_physics,_=physics_editor(material_getter=lambda:{'family':custom_family.value,'base_polymer':custom_base.value})
                 def save_custom_material():
                     name=(custom_name.value or '').strip(); abbreviation=(custom_abbr.value or '').strip().upper()
                     family_name=(custom_family.value or '').strip(); mechanisms=(custom_mechanisms.value or '').strip()
@@ -272,6 +334,13 @@ def materials():
                     except (TypeError,ValueError): modulus=0
                     if len(name)<2 or len(abbreviation)<1 or len(family_name)<2 or modulus<=0:
                         ui.notify('Renseignez un nom, une abréviation, une famille et un module positif.',type='negative'); return
+                    description={key:control.value for key,control in custom_descriptors.items()}
+                    description.update(reinforcement_pct=custom_reinforcement_pct.value,recycled_content_pct=custom_recycled_pct.value)
+                    try:
+                        validate_descriptors(description)
+                        description['physics_model']=custom_physics()
+                    except ValueError as exc:
+                        ui.notify(str(exc),type='negative'); return
                     ident='CUSTOM-'+uuid4().hex[:10].upper()
                     store.save(owner(),'custom_material',name,{
                         'id':ident,'name':name[:120],'abbreviation':abbreviation[:20],
@@ -284,14 +353,13 @@ def materials():
                         'grade_reference':(custom_reference.value or '').strip()[:300],
                         'process_state':(custom_process.value or '').strip()[:100],
                         'morphology':(custom_morphology.value or 'Inconnu')[:80],
-                        'reinforcement':((custom_reinforcement.value or '').strip() or 'Aucun')[:120],
-                        'reinforcement_pct':float(custom_reinforcement_pct.value or 0),
-                        'recycled_content_pct':float(custom_recycled_pct.value or 0),
+                        'reinforcement':((custom_reinforcement.value or '').strip() or 'Non renseigné')[:120],
+                        **description,
                         'stabilizers':(custom_stabilizers.value or '').strip()[:200],
                         'service_exposure':custom_exposure.value,
                         'suggested_modulus_mpa':modulus,
                     })
-                    ui.notify('Matériau ajouté. SeaMat évaluera ses analogues au calcul.',type='positive'); ui.navigate.to('/materiaux')
+                    ui.notify('Matériau et paramètres enregistrés.',type='positive'); ui.navigate.to('/materiaux')
                 ui.button('Ajouter à mes matériaux',icon='add',on_click=save_custom_material).props('unelevated')
         mine=custom_materials()
         if mine:
@@ -480,6 +548,16 @@ def datasheet_simulator(material: str | None=None):
                             value='unspecified',label='Liquide, si immersion').props('outlined').classes('w-full')
                         grade_reference=ui.input('Grade / référence commerciale',value=materials[selected].get('grade_reference') or '',placeholder='Ex. PP H301').props('outlined').classes('w-full')
                         process_state=ui.input('Procédé / état de conditionnement',value=materials[selected].get('process_state') or '',placeholder='Ex. injection, conditionné à 23 °C').props('outlined').classes('w-full')
+                        tolerance=ui.select({5:'±5 % · exigeant',10:'±10 %',20:'±20 %'},value=5,label='Erreur acceptable pour mesurer la précision').props('outlined').classes('w-full')
+                        descriptor_controls={}
+                        with ui.expansion('Composition et propriétés du matériau',icon='science').classes('w-full'):
+                            with ui.row().classes('w-full p-3 gap-3 flex-wrap'):
+                                for key,(label,low,high) in DESCRIPTORS.items():
+                                    descriptor_controls[key]=ui.number(label,value=materials[selected].get(key),min=low,max=high).props('outlined clearable').classes('grow min-w-48')
+                            stabilizers=ui.input('Stabilisants / additifs',value=materials[selected].get('stabilizers') or '').props('outlined').classes('w-full p-3')
+                            ui.label('Les propriétés inconnues restent vides. Leur effet doit être documenté pour améliorer la précision.').classes('small p-3')
+                        read_physics,load_physics=physics_editor(materials[selected].get('physics_model'),lambda:materials[material_select.value])
+                        family_info=ui.label('Modèle de famille : '+family_plan(materials[selected])['label']).classes('field-help')
                         ui.label('En immersion, l’humidité de l’air est ignorée. Les données IIR publiées exigent Milform 64 SST entre 80 et 120 °C.').classes('field-help mt-0')
                         ui.label('Conversion : 1 année = 365,25 jours ; 1 mois moyen = 30,4375 jours.').classes('field-help mt-0')
                 def selected_evidence():
@@ -518,6 +596,10 @@ def datasheet_simulator(material: str | None=None):
                     e0.value=profile['suggested_modulus_mpa']; basis.text=profile['basis']
                     grade_reference.value=mat.get('grade_reference') or ''
                     process_state.value=mat.get('process_state') or ''
+                    for key,control in descriptor_controls.items(): control.value=mat.get(key)
+                    stabilizers.value=mat.get('stabilizers') or ''
+                    load_physics(mat.get('physics_model'))
+                    family_info.text='Modèle de famille : '+family_plan(mat)['label']
                     if mat.get('service_exposure'): exposure.value=mat['service_exposure']
                     default_horizon,default_unit=recommended_horizon(mat,exposure.value)
                     horizon.value=default_horizon; horizon_unit.value=default_unit
@@ -528,14 +610,15 @@ def datasheet_simulator(material: str | None=None):
                 def calculate():
                     output.clear()
                     try:
-                        mat=materials[material_select.value]
+                        mat={**materials[material_select.value],**{key:control.value for key,control in descriptor_controls.items()},
+                             'stabilizers':stabilizers.value or None,'physics_model':read_physics()}
                         horizon_days=duration_to_days(float(horizon.value),horizon_unit.value)
                         horizon_years=horizon_days/365.25
                         if horizon_days<1 or horizon_years>100: raise ValueError('L’horizon doit être compris entre un jour et 100 ans.')
                         evidence=selected_evidence()
                         result=estimate_from_datasheet(mat,float(e0.value),float(temperature.value),float(humidity.value),
                             float(thickness.value),horizon_years,float(threshold.value),exposure.value,evidence,
-                            immersion_medium.value,grade_reference.value or None,process_state.value or None)
+                            immersion_medium.value,grade_reference.value or None,process_state.value or None,float(tolerance.value))
                         result['manifest']['inputs']['horizon_display']={'value':float(horizon.value),'unit':horizon_unit.value,
                             'label':duration_label(float(horizon.value),horizon_unit.value)}
                         result['manifest']['inputs']['grade_reference']=(grade_reference.value or '').strip() or None
@@ -555,6 +638,23 @@ def datasheet_simulator(material: str | None=None):
                                      'pill-teal' if reliability.get('tone')=='teal' else 'pill-amber')
                             ui.label(reliability.get('decision','')).classes(
                                 'pill pill-teal w-full' if reliability.get('tone')=='teal' else 'note w-full')
+                            precision=result['manifest']['precision']
+                            with ui.element('div').classes('result-grid w-full'):
+                                percent=precision['reference_precision_pct']
+                                for label,value,detail in [
+                                    ('Précision observée sur références',f"{number_fr(percent,1)} %" if percent is not None else 'Non mesurée',
+                                     (f"{precision['success_count']}/{precision['prediction_count']} prédictions à ±{precision['tolerance_pct']:g} % · {precision['group_count']} groupes" if precision['prediction_count'] else 'Aucun essai de validation disponible pour ce calcul')),
+                                    ('Précision de votre grade',f"{number_fr(precision['target_precision_pct'],1)} % · interne" if precision['target_precision_pct'] is not None else 'À valider',
+                                     'Conditions, grade et durée vérifiés séparément'),
+                                    ('Description renseignée',f"{precision['completeness_pct']} %",'Complétude de la fiche, pas fiabilité'),
+                                ]:
+                                    with ui.column().classes('result-stat gap-1'):
+                                        ui.label(label).classes('stat-label'); ui.label(value).classes('result-value'); ui.label(detail).classes('small')
+                            with ui.expansion('Ce qui influence le calcul et sa précision',icon='analytics').classes('w-full'):
+                                ui.label(precision['definition']+' '+precision['scope']).classes('small p-3')
+                                table_rows(precision['domain_checks'],['parameter','status','detail'])
+                                table_rows(precision['descriptors'],['parameter','value','status'])
+                                ui.label(result['manifest']['hybrid_engine']['reason']).classes('small p-3')
                             source_uncertainty=result['manifest']['uncertainty'].get('source_specific') or {}
                             match=assumptions.get('documentary_match') or {'score':0,'label':'Non renseigné'}
                             scientific_uncertainty_kind=source_uncertainty.get('kind')
@@ -564,8 +664,10 @@ def datasheet_simulator(material: str | None=None):
                                            if crossing is not None and lo is not None and hi is not None
                                            else 'Non borné dans le domaine calculé')
                             interval_detail=result['manifest']['uncertainty'].get('label','Plage du modèle')
+                            threshold_extrapolated=bool(crossing is not None and assumptions.get('evidence_window_days')
+                                and crossing*365.25>assumptions['evidence_window_days']+1e-9)
                             result_cards=[
-                                (('Temps estimé pour atteindre le seuil' if reliability.get('usable_for_screening')
+                                (('Temps au seuil extrapolé' if threshold_extrapolated else 'Temps au seuil calculé' if result['manifest'].get('family_physics') else 'Temps estimé pour atteindre le seuil' if reliability.get('usable_for_screening')
                                   else 'Scénario central non qualifié'),central_text,f"Seuil choisi : {threshold.value:g} %"),
                                 ('Plage estimée',interval_text,interval_detail),
                                 (f'Module à {horizon_text}',f"{number_fr(result['modulus'][-1])} MPa",f"{number_fr(result['retention'][-1],1)} % conservés"),
@@ -589,7 +691,7 @@ def datasheet_simulator(material: str | None=None):
                                          if best else 'Aucun analogue publié compatible avec le milieu choisi.')
                                 ui.label(message).classes('note w-full')
                             claim95=result['manifest'].get('reliability_95') or {}
-                            if claim95.get('independent_groups'):
+                            if claim95.get('external_test_eligible') and claim95.get('independent_groups'):
                                 ui.label(
                                     (f"Qualification 95/95 : {'démontrée' if claim95.get('qualified') else 'non démontrée'} · "
                                      f"{claim95['covered_groups']}/{claim95['independent_groups']} groupes couverts · "
@@ -619,6 +721,14 @@ def datasheet_simulator(material: str | None=None):
                                 if reliability.get('usable_for_screening') else
                                 "Aucune durée de vie exploitable n’est disponible pour ce cas. La courbe reste un scénario de recherche à confronter à des données compatibles."
                             )
+                            if threshold_extrapolated:
+                                summary_text=(f"Module central à {horizon_text} : {number_fr(result['modulus'][-1])} MPa. "
+                                    f"Le seuil de {threshold.value:g} % est projeté à {central_text}, au-delà des "
+                                    f"{assumptions['evidence_window_days']:g} jours documentés. La précision mesurée sur le module ne valide pas ce délai.")
+                            if result['manifest'].get('family_physics'):
+                                summary_text=(f"Les mécanismes et coefficients saisis donnent {number_fr(result['modulus'][-1])} MPa à {horizon_text}. "
+                                    + (f"Le seuil est atteint après {central_text}. " if crossing is not None else 'Le seuil n’est pas atteint pendant la durée étudiée. ')
+                                    + 'Cette prédiction peut être figée pour comparaison aux essais ; sa précision expérimentale reste à mesurer.')
                             ui.label(summary_text).classes('result-summary w-full')
                             with ui.expansion('Détails et méthode',icon='info_outline').classes('w-full'):
                                 details_mount=ui.column().classes('w-full gap-3 p-3')
@@ -627,7 +737,7 @@ def datasheet_simulator(material: str | None=None):
                             curve_values_panel.move(details_mount)
                             if assumptions['evidence_calibrated'] and assumptions['extrapolation_multiple']>1:
                                 ui.label(f"Après {assumptions['evidence_window_days']:.0f} jours, la zone orangée signale une extrapolation.").classes('note w-full')
-                            elif not assumptions['evidence_calibrated']:
+                            elif not assumptions['evidence_calibrated'] and not result['manifest'].get('family_physics'):
                                 with ui.expansion('Comprendre la plage de sensibilité',icon='tune').classes('w-full') as sensitivity_panel:
                                     ui.label('La ligne centrale reste le résultat recommandé. Les deux bornes forment une plage totale de 10 %, soit ±5 % sur la vitesse. Elles ne sont pas des probabilités.').classes('field-help')
                                     table_rows([
@@ -676,7 +786,11 @@ def datasheet_simulator(material: str | None=None):
                             result_validity_panel=validity_panel(result)
                             result_validity_panel.move(details_mount)
                             with ui.expansion('Méthode, facteurs et traçabilité',icon='fact_check').classes('w-full') as method_panel:
-                                if assumptions['evidence_calibrated']:
+                                if result['manifest'].get('family_physics'):
+                                    physics=result['manifest']['family_physics']
+                                    method_rows=[{'label':PARAMETERS[key][0],'value':f'{value:g}','meaning':physics['source']} for key,value in physics['parameters'].items()]
+                                    ui.label(physics['formula']).classes('small')
+                                elif assumptions['evidence_calibrated']:
                                     if scientific_uncertainty_kind in {'source_level_predictive_interval','extrapolation_sensitivity'}:
                                         calibration=source_uncertainty['calibration']
                                         method_rows=[
@@ -784,7 +898,7 @@ def datasheet_simulator(material: str | None=None):
                     ui.button('Calculer',icon='show_chart',on_click=calculate).props('unelevated size=lg').classes('w-full')
                 calculate()
             with ui.column().classes('panel gap-4 simulation-results'):
-                ui.label('Aperçu instantané').classes('section-title')
+                ui.label('Résultat du dernier calcul').classes('section-title')
                 result_mount=ui.column().classes('w-full gap-4')
             output.move(result_mount)
 
@@ -1266,12 +1380,12 @@ def validity_page():
                 ui.label('Objectif statistique 95/95').classes('section-title')
                 pill('DÉMONTRÉ' if pp_qualification['qualified'] else 'NON DÉMONTRÉ',
                      'pill-teal' if pp_qualification['qualified'] else 'pill-amber')
-            ui.label('Cible : couvrir au moins 95 % des futurs groupes comparables, avec un niveau de confiance de 95 %. Chaque formulation ou campagne entièrement masquée compte comme une unité ; ses temps corrélés ne sont pas comptés comme des essais indépendants.').classes('body-copy')
+            ui.label('Cible : couvrir 95 % des futurs cas comparables avec 95 % de confiance, sur un test externe après gel du modèle et des bornes. Les groupes utilisés pour calibrer la bande ne comptent pas comme des succès externes.').classes('body-copy')
             with ui.element('div').classes('result-grid w-full'):
                 for label,value,detail in [
                     ('Groupes PP couverts',f"{pp_qualification['covered_groups']} / {pp_qualification['independent_groups']}",'Quatre formulations entièrement masquées'),
-                    ('Borne basse à 95 %',f"{number_fr(pp_qualification['one_sided_lower_bound_pct'],1)} %",'Couverture minimale statistiquement défendable'),
-                    ('Validations encore requises',str(pp_qualification['additional_groups_best_case']),'Meilleur cas : aucune erreur supplémentaire'),
+                    ('Borne externe à 95 %','Non établie','Validation interne seulement'),
+                    ('Test externe','À constituer','59 succès indépendants : exemple théorique, pas un quota acquis'),
                 ]:
                     with ui.column().classes('result-stat gap-1'):
                         ui.label(label).classes('stat-label'); ui.label(value).classes('result-value'); ui.label(detail).classes('small')
@@ -2278,6 +2392,11 @@ def v2_benchmark_api():
         'interpretation':('Les cas exacts/interpolés et les transferts de température sont '
                           'séparés ; une erreur de transfert élevée élargit automatiquement la bande.'),
     }
+
+@app.get('/api/v3/audit-donnees-reelles')
+def v3_real_data_audit_api():
+    """End-to-end release check using only accepted published observations."""
+    return real_data_audit()
 
 @app.get('/api/validation/pp')
 def pp_validation_api():

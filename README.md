@@ -2,7 +2,11 @@
 
 **Python 3.11–3.13 · Windows · macOS · Linux · Docker**
 
-Version actuelle : **2.4.0**. SeaMat est la nouvelle branche de développement scientifique issue de Materia 0.46. Elle possède son propre code, sa propre base SQLite, ses propres secrets et son propre port. Materia reste disponible sur le port 8087 ; SeaMat utilise le port 8088 et les deux logiciels peuvent fonctionner simultanément.
+Version actuelle : **3.1.0**. SeaMat est la nouvelle branche de développement scientifique issue de Materia 0.46. Elle possède son propre code, sa propre base SQLite, ses propres secrets et son propre port. Materia reste disponible sur le port 8087 ; SeaMat utilise le port 8088 et les deux logiciels peuvent fonctionner simultanément.
+
+La version 3.1 ajoute un [modèle par mécanismes et familles](docs/MOTEUR_FAMILLES_V31.md) avec coefficients explicites, diffusion d’eau, UV, thermique et rigidification.
+
+Le moteur 3.0 ajoute une précision mesurée à une tolérance choisie (±5 %, ±10 % ou ±20 %), les conditions d’applicabilité au grade saisi et la description détaillée du matériau. Les effets environnementaux sont appris uniquement quand des séries compatibles permettent de les identifier et de les tester par groupes masqués. Une propriété renseignée ne fait pas augmenter artificiellement la précision. Voir [le fonctionnement et les limites du moteur](docs/MOTEUR_PRECISION_V3.md).
 
 SeaMat conserve le catalogue, les simulations, les comparaisons, les exports, l'espace classe et les validations existantes. Le moteur V2 et ses dix contrôles sont décrits dans [l'architecture scientifique](docs/ARCHITECTURE_SCIENTIFIQUE_V2.md) et leurs résultats chiffrés dans [la validation du moteur V2.1](docs/VALIDATION_MOTEUR_V2.1.md). Voir aussi [l'installation complète](docs/INSTALLATION.md), [la comparaison aux essais réels](docs/COMPARAISON_ESSAIS_REELS_V0.46.md) et [la qualification statistique 95/95](docs/VALIDATION_95.md).
 
@@ -68,6 +72,11 @@ GitHub Pages ne peut pas exécuter cette application Python. Pour obtenir cette 
 6. Créer un compte, enregistrer le résultat, puis rejoindre un cours dans **Espace classe**.
 
 ## Tests
+
+L'audit reproductible sur les observations publiées est documenté dans
+[`docs/AUDIT_DONNEES_REELLES_V31.md`](docs/AUDIT_DONNEES_REELLES_V31.md). Une
+installation en cours d'exécution expose aussi le rapport JSON par
+`GET /api/v3/audit-donnees-reelles`.
 
 ```sh
 .venv/bin/python -m pytest -q

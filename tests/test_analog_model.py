@@ -41,12 +41,29 @@ def test_close_manual_pp_uses_auditable_analogue_inside_published_window():
     assert transfer['threshold_within_evidence'] is False
 
 
+def test_custom_grade_preserves_time_units_and_cannot_borrow_target_accuracy():
+    from seamat.charts import curve, _comparison_time_days
+    from seamat.excel_reporting import _time_days, _display_axis
+    from seamat.modeling import curve_value_origin
+    result=estimate(custom_pp())
+    assert _time_days(result)[-1]==pytest.approx(120)
+    assert _comparison_time_days(result)[-1]==pytest.approx(120)
+    assert _display_axis(result)[1]=='années'
+    assert 'années' in curve(result).layout.xaxis.title.text
+    assert 'analogue' in curve_value_origin(result)
+    precision=result['manifest']['precision']
+    assert precision['reference_precision_pct']==100
+    assert precision['target_precision_pct'] is None
+    assert precision['external_qualified'] is False
+
+
 def test_analogue_transfer_adds_uncertainty_to_the_source_model():
     result=estimate(custom_pp())
     uncertainty=result['manifest']['uncertainty']
     source=uncertainty['source_specific']
-    assert uncertainty['kind']=='source_calibration_plus_analogue_penalty'
-    assert uncertainty['base_half_width_pct']>source['base_half_width_pct']
+    assert uncertainty['kind']=='standardized_rate_sensitivity'
+    assert source['kind']=='source_calibration_plus_analogue_penalty'
+    assert source['base_half_width_pct']>source['source_specific']['base_half_width_pct']
     assert all(low<center<high for low,center,high in
                zip(result['lower'][1:],result['modulus'][1:],result['upper'][1:]))
 

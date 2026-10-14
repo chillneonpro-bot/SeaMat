@@ -14,8 +14,8 @@ def _clean(value: object) -> str:
 def markdown_report(result: dict, title: str = 'Rapport SeaMat') -> bytes:
     manifest=result.get('manifest',{}); inputs=manifest.get('inputs',{}); model=str(manifest.get('model','inconnu'))
     title=_clean(title)[:200]; status=_clean(manifest.get('status','Statut inconnu'))
-    display=inputs.get('horizon_display',{}) if model.startswith('datasheet-screening-') else {}
-    unit={'days':'jours','months':'mois','years':'années'}.get(display.get('unit'),'années' if model.startswith('datasheet-screening-') else 'jours')
+    display=inputs.get('horizon_display',{}) if model.startswith(('datasheet-screening-', 'datasheet-analog-')) else {}
+    unit={'days':'jours','months':'mois','years':'années'}.get(display.get('unit'),'années' if model.startswith(('datasheet-screening-', 'datasheet-analog-')) else 'jours')
     reliability=manifest.get('reliability') or {}
     lines=[f'# {title}','',f'**Généré le :** {datetime.now(timezone.utc).isoformat()}',
            f'**Modèle :** `{model}`',
@@ -24,7 +24,7 @@ def markdown_report(result: dict, title: str = 'Rapport SeaMat') -> bytes:
            f'**Qualification :** {_clean(reliability.get("label","Non évaluée"))}',
            f'**Décision :** {_clean(reliability.get("decision","Non évaluée"))}',
            f'**Empreinte :** `{_clean(result.get("fingerprint"))}`','']
-    if model.startswith('datasheet-screening-'):
+    if model.startswith(('datasheet-screening-', 'datasheet-analog-')):
         assessment=evidence_assessment(result)
         crossing=result.get('crossing_estimate_years'); lo,hi=result.get('crossing_interval',[None,None])
         horizon_text=display.get('label') or f"{float(inputs['horizon_years']):g} ans"
@@ -59,6 +59,26 @@ def markdown_report(result: dict, title: str = 'Rapport SeaMat') -> bytes:
                   f"- Origine de la valeur à l’horizon : {curve_value_origin(result)}",
                   f"- Franchissement : {float(crossing):g} jours" if crossing is not None else '- Franchissement : non atteint',
                   '- Nature : scénario synthétique, sans validation matérielle','']
+    precision=manifest.get('precision') or {}
+    if precision:
+        measured=precision.get('reference_precision_pct')
+        value=(f"{measured:.1f} % à ±{precision['tolerance_pct']:g} %" if measured is not None else 'Non mesurée')
+        lines += ['## Précision mesurée','',f'- Sur les références : {value}',
+                  f"- Comparaisons masquées : {precision['success_count']}/{precision['prediction_count']} ; {precision['group_count']} groupes",
+                  f"- Votre grade : {precision['target_status']}",
+                  f"- Portée : {precision['scope']}",
+                  f"- Description renseignée : {precision['completeness_pct']} % (ce n’est pas une précision)",'']
+        lines += [f"- {_clean(check['parameter'])} : {_clean(check['status'])}. {_clean(check['detail'])}" for check in precision['domain_checks']]
+        lines += ['']
+    physics=manifest.get('family_physics') or {}
+    if physics:
+        from seamat.family_physics import PARAMETERS,MECHANISMS
+        lines += ['## Modèle par mécanismes','',f"- Famille : {physics['family']['label']}",
+                  '- Mécanismes : '+', '.join(MECHANISMS[k] for k in physics['mechanisms']),
+                  '- Référence des coefficients : '+_clean(physics['source']),
+                  '- Formule : '+physics['formula'],'']
+        lines += [f"- {PARAMETERS[key][0]} : {value:g} ; bornes {_clean(physics['bounds'].get(key))}" for key,value in physics['parameters'].items()]
+        lines += ['']
     warnings=manifest.get('warnings',[])
     if warnings:
         lines += ['## Limites','']+[f'- {_clean(item)}' for item in warnings]+['']
@@ -68,7 +88,7 @@ def markdown_report(result: dict, title: str = 'Rapport SeaMat') -> bytes:
     if source:
         lines += ['## Source','',f"- {_clean(source.get('title') or source.get('id'))}",
                   f"- {_clean(source.get('url') or source.get('location'))}",'']
-    rows=sampled_curve_rows(result,time_unit=None if model.startswith('datasheet-screening-') else unit)
+    rows=sampled_curve_rows(result,time_unit=None if model.startswith(('datasheet-screening-', 'datasheet-analog-')) else unit)
     lines += ['## Valeurs principales','',f'| Temps ({unit}) | Module central (MPa) | Borne basse | Borne haute | Conservation (%) | Origine |',
               '|---:|---:|---:|---:|---:|:---|']
     lines += [f"| {row['temps']:g} | {row['module_mpa']:g} | {row['module_min_mpa']:g} | {row['module_max_mpa']:g} | {row['retention_pct']:g} | {row['origine']} |" for row in rows]

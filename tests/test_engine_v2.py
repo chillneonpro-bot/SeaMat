@@ -57,7 +57,7 @@ def test_controls_4_to_6_route_pp_and_record_domain_match():
 def test_control_7_pp_band_is_calibrated_on_hidden_formulations():
     result=predict_from_evidence(request(),material_db.evidence_rows('PP','outdoor'))
     uncertainty=result['manifest']['uncertainty']
-    assert uncertainty['kind']=='calibrated_log_conformal'
+    assert uncertainty['kind']=='empirical_group_residuals'
     assert uncertainty['base_half_width_pct']==pytest.approx(3.4109767496)
     assert uncertainty['target_coverage_pct']==95
     assert uncertainty['calibration']['empirical_point_coverage_pct']==100
@@ -84,6 +84,14 @@ def test_exact_iir_curve_and_unmeasured_temperature_are_not_confused():
     assert 'INSUFFISANTE' in transfer['manifest']['status']
 
 
+def test_exact_iir_threshold_is_found_inside_the_24_hour_window():
+    rows=material_db.evidence_rows('IIR','immersion')
+    result=predict_from_evidence(request('IIR',100,1,'immersion','milform64'),rows)
+    crossing_days=result['crossing_estimate_years']*365.25
+    assert 0 < crossing_days < 1
+    assert result['crossing']==pytest.approx(result['crossing_estimate_years'])
+
+
 def test_extrapolation_band_expands_beyond_observations():
     rows=material_db.evidence_rows('PP','outdoor')
     short=predict_from_evidence(request(horizon=120),rows)
@@ -91,7 +99,7 @@ def test_extrapolation_band_expands_beyond_observations():
     short_width=(short['upper'][-1]-short['lower'][-1])/short['modulus'][-1]
     long_width=(long['upper'][-1]-long['lower'][-1])/long['modulus'][-1]
     assert long_width>short_width
-    assert short['manifest']['uncertainty']['predictive_interval_validated'] is True
+    assert short['manifest']['uncertainty']['predictive_interval_validated'] is False
     assert long['manifest']['uncertainty']['predictive_interval_validated'] is False
 
 

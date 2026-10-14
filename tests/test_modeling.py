@@ -87,8 +87,9 @@ def test_datasheet_estimator_uses_environment_and_reports_threshold():
     assert calibrated['manifest']['assumptions']['evidence_calibrated'] is True
     assert calibrated['crossing_interval'][1] / calibrated['crossing_interval'][0] < 3
     assert calibrated['manifest']['model']=='datasheet-screening-v6-seamat-engine'
-    assert calibrated['manifest']['uncertainty']['kind']=='calibrated_log_conformal'
-    assert calibrated['manifest']['uncertainty']['source_specific']['kind']=='v2_holdout_validation'
+    assert calibrated['manifest']['uncertainty']['kind']=='standardized_rate_sensitivity'
+    assert calibrated['manifest']['uncertainty']['source_specific']['kind']=='empirical_group_residuals'
+    assert calibrated['manifest']['uncertainty']['source_specific']['source_specific']['kind']=='v2_holdout_validation'
     assert calibrated['manifest']['uncertainty']['predictive_interval_validated'] is False
     assert calibrated['manifest']['source']['doi'] is None or isinstance(calibrated['manifest']['source']['doi'],str)
     assert evidence_assessment(calibrated)['level']=='Niveau 1 sur 4'
@@ -113,7 +114,8 @@ def test_datasheet_materials_use_calibrated_interval_when_evidence_exists():
                    in zip(result['lower'],result['modulus'],result['upper']))
     calibrated=estimate_from_datasheet(material_db.material('PP'),1500,23,50,2,5,80,'outdoor',
                                        material_db.evidence_rows('PP','outdoor'))
-    assert calibrated['manifest']['uncertainty']['kind']=='calibrated_log_conformal'
+    assert calibrated['manifest']['uncertainty']['kind']=='standardized_rate_sensitivity'
+    assert calibrated['manifest']['uncertainty']['source_specific']['kind']=='empirical_group_residuals'
     assert calibrated['manifest']['assumptions']['validation']['test_predictions']==8
     assert all(lower<=center<=upper for lower,center,upper
                in zip(calibrated['lower'],calibrated['modulus'],calibrated['upper']))
@@ -135,7 +137,8 @@ def test_iir_uses_published_surface_only_inside_temperature_domain():
     outside=estimate_from_datasheet(material,10,23,50,2,1/365.25,70,'immersion',rows,'milform64')
     assert inside['manifest']['assumptions']['evidence_calibrated'] is True
     assert inside['manifest']['assumptions']['evidence_window_days']==pytest.approx(1)
-    assert inside['manifest']['uncertainty']['kind']=='reported_sd_plus_model_floor'
+    assert inside['manifest']['uncertainty']['kind']=='standardized_rate_sensitivity'
+    assert inside['manifest']['uncertainty']['source_specific']['kind']=='reported_sd_plus_model_floor'
     assert inside['manifest']['assumptions']['profile_method']=='exact_temperature_curve'
     # Official Table 2 (with Milform 64 SST) reports 2.70 MPa initially and
     # 1.92 MPa at 24 h at 100 °C.
@@ -149,10 +152,12 @@ def test_iir_unmeasured_temperature_uses_masked_transfer_error_not_published_sd(
     material=material_db.material('IIR'); rows=material_db.evidence_rows('IIR','immersion')
     interpolated=estimate_from_datasheet(material,10,90,50,2,1/365.25,70,'immersion',rows,'milform64')
     uncertainty=interpolated['manifest']['uncertainty']
-    assert uncertainty['kind']=='calibrated_log_conformal'
-    assert uncertainty['source_specific']['kind']=='v2_holdout_validation'
-    assert uncertainty['base_half_width_pct']==pytest.approx(28.7630553980)
-    assert uncertainty['calibration']['mape_pct']==pytest.approx(11.3127888460)
+    assert uncertainty['kind']=='standardized_rate_sensitivity'
+    source=uncertainty['source_specific']
+    assert source['kind']=='empirical_group_residuals'
+    assert source['source_specific']['kind']=='v2_holdout_validation'
+    assert source['base_half_width_pct']==pytest.approx(28.7630553980)
+    assert source['calibration']['mape_pct']==pytest.approx(11.3127888460)
     assert interpolated['manifest']['assumptions']['profile_method']=='temperature_surface_interpolation'
 
 
@@ -186,13 +191,14 @@ def test_pp_evidence_profile_is_tight_in_domain_and_expands_after_observations()
     assert short['retention'][-1]==pytest.approx(90.01,abs=.05)
     short_width=(short['upper'][-1]-short['lower'][-1])/short['modulus'][-1]
     long_width=(long['upper'][-1]-long['lower'][-1])/long['modulus'][-1]
-    assert .05 < short_width < .08
-    assert short['manifest']['uncertainty']['kind']=='calibrated_log_conformal'
-    assert short['manifest']['uncertainty']['source_specific']['kind']=='v2_holdout_validation'
-    assert short['manifest']['uncertainty']['predictive_interval_validated'] is True
+    assert 0 < short_width < .02
+    assert short['manifest']['uncertainty']['kind']=='standardized_rate_sensitivity'
+    assert short['manifest']['uncertainty']['source_specific']['kind']=='empirical_group_residuals'
+    assert short['manifest']['uncertainty']['source_specific']['source_specific']['kind']=='v2_holdout_validation'
+    assert short['manifest']['uncertainty']['predictive_interval_validated'] is False
     assert short['manifest']['assumptions']['independent_sources']==1
     assert short['manifest']['uncertainty']['calibration']['test_predictions']==8
-    assert short_width < long_width < .60
+    assert short_width < long_width < .10
     assert all(lo<=mid<=hi for lo,mid,hi in zip(long['lower'],long['modulus'],long['upper']))
     assert long['manifest']['source']['id']=='mdpi-pp-natural-aging-2024'
     assert 'outer_lower' not in short and 'outer_upper' not in long
@@ -233,8 +239,9 @@ def test_pp_long_horizon_replaces_calibrated_band_with_projection_sensitivity():
     material=material_db.material('PP')
     result=estimate_from_datasheet(material,1100,23,50,2,2,80,'outdoor',
                                    material_db.evidence_rows('PP','outdoor'))
-    assert result['manifest']['uncertainty']['kind']=='calibrated_log_conformal'
-    assert result['manifest']['uncertainty']['source_specific']['kind']=='v2_holdout_validation'
+    assert result['manifest']['uncertainty']['kind']=='standardized_rate_sensitivity'
+    assert result['manifest']['uncertainty']['source_specific']['kind']=='empirical_group_residuals'
+    assert result['manifest']['uncertainty']['source_specific']['source_specific']['kind']=='v2_holdout_validation'
     assert result['manifest']['uncertainty']['predictive_interval_validated'] is False
     assert result['lower'][-1] < result['modulus'][-1] < result['upper'][-1]
     assert result['upper'][-1] / result['lower'][-1] < 1.5

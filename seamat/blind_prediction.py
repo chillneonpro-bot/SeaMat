@@ -116,6 +116,7 @@ def freeze_prediction(result: dict, title: str, data_cutoff: str | None = None) 
         'frozen_at':datetime.now(timezone.utc).isoformat(),
         'data_cutoff':data_cutoff or datetime.now(timezone.utc).date().isoformat(),
         'model':manifest.get('model'),
+        'model_manifest':_detached(manifest),
         'model_fingerprint':result.get('fingerprint'),
         'evidence_level':manifest.get('evidence_level'),
         'source':_detached(manifest.get('source')),
