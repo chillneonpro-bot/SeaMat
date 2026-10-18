@@ -14,7 +14,7 @@ from seamat import store
 
 USERNAME_RE=re.compile(r'^[a-z0-9._-]{3,80}$')
 ROLES={'student','teacher','admin'}
-DATA_DIR=Path(__file__).parents[1]/'data'
+DATA_DIR=Path(os.environ.get('SEAMAT_DATA_DIR',Path(__file__).parents[1]/'data'))
 
 
 def server_token(env_name: str, filename: str) -> str:

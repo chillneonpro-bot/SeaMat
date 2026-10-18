@@ -23,6 +23,9 @@ output/
 outputs/
 tmp/
 *.log
+build/
+dist/
+*.spec
 
 # Configuration locale
 .env

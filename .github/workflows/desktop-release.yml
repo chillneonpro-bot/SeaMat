@@ -1,0 +1,139 @@
+name: Applications de bureau
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - desktop.py
+      - main.py
+      - 'seamat/**'
+      - 'packaging/**'
+      - requirements-lock.txt
+      - '.github/workflows/desktop-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            requirements-lock.txt
+            packaging/requirements-desktop.txt
+      - name: Installer les composants de construction
+        run: python -m pip install -r packaging/requirements-desktop.txt
+      - name: Construire SeaMat.exe
+        run: nicegui-pack --onefile --windowed --name SeaMat --icon packaging/SeaMat.ico --add-data "seamat/style.css;seamat" --clean --noconfirm desktop.py
+      - name: Tester réellement l'exécutable
+        shell: pwsh
+        run: |
+          $env:SEAMAT_DESKTOP_NATIVE = '0'
+          $process = Start-Process -FilePath '.\dist\SeaMat.exe' -PassThru
+          try {
+            $ready = $false
+            foreach ($attempt in 1..120) {
+              try {
+                $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8088/health' -TimeoutSec 3
+                if ($health.status -eq 'ok' -and $health.version -eq '3.1.1') { $ready = $true; break }
+              } catch {}
+              Start-Sleep -Seconds 2
+            }
+            if (-not $ready) { throw 'SeaMat.exe ne répond pas au contrôle de santé.' }
+            $benchmark = Invoke-RestMethod -Uri 'http://127.0.0.1:8088/api/v2/benchmark' -TimeoutSec 60
+            if (-not $benchmark.pp_23c_120d.fingerprint) { throw 'Le moteur scientifique ne répond pas.' }
+          } finally {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+          }
+      - name: Préparer le téléchargement Windows
+        shell: pwsh
+        run: Move-Item '.\dist\SeaMat.exe' '.\SeaMat-Windows-x64.exe'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-windows-x64
+          path: SeaMat-Windows-x64.exe
+          if-no-files-found: error
+
+  macos:
+    name: macOS · ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            label: Apple Silicon
+            filename: SeaMat-macOS-Apple-Silicon.zip
+          - runner: macos-15-intel
+            label: Intel
+            filename: SeaMat-macOS-Intel.zip
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            requirements-lock.txt
+            packaging/requirements-desktop.txt
+      - name: Installer les composants de construction
+        run: python -m pip install -r packaging/requirements-desktop.txt
+      - name: Construire SeaMat.app
+        run: nicegui-pack --onedir --windowed --name SeaMat --icon packaging/SeaMat.icns --osx-bundle-identifier fr.seamat.desktop --add-data "seamat/style.css:seamat" --clean --noconfirm desktop.py
+      - name: Tester réellement l'application
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SEAMAT_DESKTOP_NATIVE=0
+          ./dist/SeaMat.app/Contents/MacOS/SeaMat &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in {1..120}; do
+            if health=$(curl --fail --silent http://127.0.0.1:8088/health); then
+              python -c "import json,sys; d=json.loads(sys.argv[1]); assert d['status']=='ok' and d['version']=='3.1.1'" "$health"
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          test "$ready" = 1
+          curl --fail --silent http://127.0.0.1:8088/api/v2/benchmark | python -c "import json,sys; assert json.load(sys.stdin)['pp_23c_120d']['fingerprint']"
+      - name: Signer localement et créer le ZIP
+        run: |
+          codesign --force --deep --sign - dist/SeaMat.app
+          ditto -c -k --sequesterRsrc --keepParent dist/SeaMat.app "${{ matrix.filename }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-macos-${{ matrix.label }}
+          path: ${{ matrix.filename }}
+          if-no-files-found: error
+
+  release:
+    name: Publication GitHub
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: package-*
+          path: release
+          merge-multiple: true
+      - name: Produire les empreintes SHA-256
+        run: |
+          cd release
+          sha256sum SeaMat-* > SHA256SUMS.txt
+      - name: Publier la version téléchargeable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" release/* --title "SeaMat 3.1.1 — Windows et macOS" --notes-file packaging/RELEASE_NOTES.md

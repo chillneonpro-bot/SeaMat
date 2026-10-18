@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 import sys
 import tempfile
@@ -80,7 +81,8 @@ def create_daily_backup(folder: str | Path | None = None, keep: int = 14) -> dic
     """Create at most one verified backup per UTC day and keep a bounded history."""
     if not 2<=keep<=365:
         raise ValueError('La rétention doit être comprise entre 2 et 365 sauvegardes.')
-    root=Path(folder or Path(__file__).parents[1]/'data'/'backups'/'daily'); root.mkdir(parents=True,exist_ok=True)
+    default_root=Path(os.environ.get('SEAMAT_BACKUP_DIR',Path(__file__).parents[1]/'data'/'backups'/'daily'))
+    root=Path(folder or default_root); root.mkdir(parents=True,exist_ok=True)
     today=datetime.now(timezone.utc).date().isoformat(); destination=root/f'seamat-{today}.zip'
     if destination.exists():
         result=verify_backup_archive(destination)|{'archive':str(destination),'created':False}

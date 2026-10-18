@@ -4,7 +4,7 @@
 
 SeaMat est une application Python destinée aux étudiants, enseignants et chercheurs en matériaux. Elle permet de sélectionner ou décrire un polymère, définir ses conditions de service, générer une courbe de vieillissement du module de Young, comparer plusieurs scénarios et exporter un résultat traçable.
 
-> **Version 3.1.0 — Windows, macOS, Linux et Docker**
+> **Version 3.1.1 — Windows, macOS, Linux et Docker**
 >
 > Interface en français · Python 3.11 à 3.13 · NiceGUI · Plotly · SQLite
 
@@ -21,14 +21,26 @@ Le [sommaire de la documentation](docs/README.md) donne accès aux documents tec
 
 ## Lancer SeaMat
 
-### Windows
+### Applications prêtes à utiliser — sans installer Python
+
+| Système | Téléchargement direct |
+|---|---|
+| **Windows 10/11, 64 bits** | [Télécharger SeaMat-Windows-x64.exe](https://github.com/chillneonpro-bot/SeaMat/releases/latest/download/SeaMat-Windows-x64.exe) |
+| **macOS Apple Silicon** — M1, M2, M3, M4… | [Télécharger SeaMat-macOS-Apple-Silicon.zip](https://github.com/chillneonpro-bot/SeaMat/releases/latest/download/SeaMat-macOS-Apple-Silicon.zip) |
+| **macOS Intel** | [Télécharger SeaMat-macOS-Intel.zip](https://github.com/chillneonpro-bot/SeaMat/releases/latest/download/SeaMat-macOS-Intel.zip) |
+
+Ces versions autonomes ouvrent SeaMat dans une fenêtre d’application et conservent les données dans le profil de l’utilisateur. Consultez la [dernière version publiée](https://github.com/chillneonpro-bot/SeaMat/releases/latest) pour les instructions du premier lancement et les empreintes SHA-256.
+
+### Installation depuis le code source
+
+#### Windows
 
 1. Télécharger le dépôt avec **Code → Download ZIP**.
 2. Extraire complètement le fichier ZIP.
 3. Installer [Python 3.11, 3.12 ou 3.13](https://www.python.org/downloads/) si nécessaire.
 4. Double-cliquer sur **`Lancer-SeaMat-Windows.bat`**.
 
-### macOS
+#### macOS
 
 1. Télécharger puis décompresser le dépôt.
 2. Installer [Python 3.11, 3.12 ou 3.13](https://www.python.org/downloads/) si nécessaire.
@@ -37,7 +49,7 @@ Le [sommaire de la documentation](docs/README.md) donne accès aux documents tec
 
 Au premier démarrage, le lanceur crée un environnement isolé et installe automatiquement les dépendances. SeaMat s’ouvre ensuite sur [http://127.0.0.1:8088](http://127.0.0.1:8088).
 
-### Docker
+#### Docker
 
 ```sh
 docker compose up --build

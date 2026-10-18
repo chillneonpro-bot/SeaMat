@@ -5,11 +5,12 @@ import json
 import logging
 import os
 import secrets
+from multiprocessing import freeze_support
 from pathlib import Path
 from uuid import uuid4
 import numpy as np
 from fastapi import HTTPException
-from nicegui import app, ui, run
+from nicegui import app, native, ui, run
 from seamat import __version__, store, literature, material_db, classroom, auth, experiments, deployment, maintenance
 from seamat.science import CATALOG, VERSION, Scenario, simulate, parse_measurements, fit_measurements, REQUIRED
 from seamat.excel_reporting import (MIME_XLSX, blind_validation_template_workbook,
@@ -2419,7 +2420,8 @@ def flax_validation_api():
     rows=material_db.observation_rows('FLAX_EPOXY',include_pending=True)
     return {'temperature_transfer':flax_temperature_transfer_benchmark(rows)}
 
-if __name__ in {'__main__','__mp_main__'}:
+def run_application(*, native_mode: bool = False) -> None:
+    """Start SeaMat either as a local web app or as a packaged desktop app."""
     teacher_token,teacher_created=auth.ensure_server_token('SEAMAT_TEACHER_TOKEN','.teacher_token','ENS')
     review_token,review_created=auth.ensure_server_token('SEAMAT_REVIEW_TOKEN','.review_token','REV')
     if teacher_created:
@@ -2430,12 +2432,19 @@ if __name__ in {'__main__','__mp_main__'}:
     material_db.migrate()
     try: maintenance.create_daily_backup()
     except Exception: logging.exception('Daily backup failed')
-    secret_file=ROOT/'data'/'.secret'; secret_file.parent.mkdir(exist_ok=True)
+    data_dir=Path(os.environ.get('SEAMAT_DATA_DIR',ROOT/'data'))
+    secret_file=data_dir/'.secret'; secret_file.parent.mkdir(parents=True,exist_ok=True)
     if not secret_file.exists():
         secret_file.write_text(secrets.token_hex(32)); secret_file.chmod(0o600)
-    ui.run(host=os.environ.get('SEAMAT_HOST','127.0.0.1'),
-           port=int(os.environ.get('SEAMAT_PORT','8088')),
+    port=native.find_open_port() if native_mode else int(os.environ.get('SEAMAT_PORT','8088'))
+    ui.run(host=os.environ.get('SEAMAT_HOST','127.0.0.1'),port=port,
            title='SeaMat · Explorer la matière',favicon='🔬',
            storage_secret=secret_file.read_text().strip(),reload=False,
-           show=os.environ.get('SEAMAT_SHOW_BROWSER','0').lower() in {'1','true','yes'},
+           native=native_mode,window_size=(1440,900) if native_mode else None,
+           show=False if native_mode else os.environ.get('SEAMAT_SHOW_BROWSER','0').lower() in {'1','true','yes'},
            language='fr')
+
+
+if __name__ in {'__main__','__mp_main__'}:
+    freeze_support()
+    run_application(native_mode=os.environ.get('SEAMAT_NATIVE','0').lower() in {'1','true','yes'})
