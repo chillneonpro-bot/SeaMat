@@ -70,16 +70,18 @@ jobs:
         include:
           - runner: macos-latest
             label: Apple Silicon
+            python: '3.13'
             filename: SeaMat-macOS-Apple-Silicon.zip
           - runner: macos-15-intel
             label: Intel
+            python: '3.11'
             filename: SeaMat-macOS-Intel.zip
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: |
             requirements-lock.txt
