@@ -1,147 +1,53 @@
-# SeaMat
+# SeaMat — logiciel et dossier de rendu
 
-**Prédire, comparer et documenter le vieillissement des polymères.**
+**Tout SeaMat au même endroit : applications Windows et Mac, guide illustré, rapport scientifique et code source.**
 
-SeaMat est une application Python destinée aux étudiants, enseignants et chercheurs en matériaux. Elle permet de sélectionner ou décrire un polymère, définir ses conditions de service, générer une courbe de vieillissement du module de Young, comparer plusieurs scénarios et exporter un résultat traçable.
+**Lien unique à transmettre : https://github.com/chillneonpro-bot/SeaMat**
 
-> **Version 3.1.1 — Windows, macOS, Linux et Docker**
->
-> Interface en français · Python 3.11 à 3.13 · NiceGUI · Plotly · SQLite
+## 1. Ouvrir le logiciel
 
-![Aperçu de l’interface SeaMat](docs/assets/apercu-seamat.png)
+Téléchargez uniquement le fichier correspondant à votre ordinateur. **Python n’est pas nécessaire pour ces applications.**
 
-## Documents à télécharger
-
-| Document | PDF prêt à lire | Version Word modifiable |
+| Votre ordinateur | Télécharger | Ensuite |
 |---|---|---|
-| **Guide complet d’utilisation** — prise en main, écrans annotés, interprétation des résultats, exports et problèmes courants | [Ouvrir le guide PDF](docs/livrables/Guide_complet_utilisation_SeaMat.pdf) | [Télécharger le guide Word](docs/livrables/Guide_complet_utilisation_SeaMat.docx) |
-| **Rapport scientifique** — contexte, méthode, équations, architecture, validation, limites et perspectives | [Ouvrir le rapport PDF](docs/livrables/Rapport_scientifique_SeaMat.pdf) | [Télécharger le rapport Word](docs/livrables/Rapport_scientifique_SeaMat.docx) |
+| Windows 10/11 — 64 bits | [**SeaMat pour Windows (.exe)**](https://github.com/chillneonpro-bot/SeaMat/releases/latest/download/SeaMat-Windows-x64.exe) | Double-cliquer sur le fichier |
+| Mac avec puce Apple — M1, M2, M3, M4… | [**SeaMat pour Mac Apple Silicon (.zip)**](https://github.com/chillneonpro-bot/SeaMat/releases/latest/download/SeaMat-macOS-Apple-Silicon.zip) | Décompresser, puis déplacer **SeaMat.app** dans Applications |
+| Mac avec processeur Intel | [**SeaMat pour Mac Intel (.zip)**](https://github.com/chillneonpro-bot/SeaMat/releases/latest/download/SeaMat-macOS-Intel.zip) | Décompresser, puis déplacer **SeaMat.app** dans Applications |
 
-Le [sommaire de la documentation](docs/README.md) donne accès aux documents techniques, aux audits et aux études de validation.
+Sur Mac, ** → À propos de ce Mac** indique le processeur. Le premier lancement peut prendre quelques dizaines de secondes. Les applications ne disposent pas de certificat commercial Apple/Microsoft : une confirmation du système peut être nécessaire. Voir les [instructions d’installation](docs/INSTALLATION.md).
 
-## Lancer SeaMat
+[Voir la version publiée et ses fichiers de contrôle](https://github.com/chillneonpro-bot/SeaMat/releases/latest). Les téléchargements sont hébergés dans la rubrique **Releases de ce même dépôt**.
 
-### Applications prêtes à utiliser — sans installer Python
+## 2. Lire les documents
 
-| Système | Téléchargement direct |
+| Document | Lire ou imprimer | Modifier |
+|---|---|---|
+| **Guide d’utilisation complet** — captures annotées, paramètres, lecture des courbes, comparaison et exports | [**Guide PDF**](docs/livrables/01_Guide_utilisation/SeaMat_Guide_utilisation_complet.pdf) | [Guide Word](docs/livrables/01_Guide_utilisation/SeaMat_Guide_utilisation_complet.docx) |
+| **Rapport scientifique** — démarche, calculs, précision, validation et limites | [**Rapport PDF**](docs/livrables/02_Rapport_scientifique/SeaMat_Rapport_scientifique.pdf) | [Rapport Word](docs/livrables/02_Rapport_scientifique/SeaMat_Rapport_scientifique.docx) |
+
+Pour enregistrer un document, ouvrez son lien puis utilisez **Download raw file / Télécharger le fichier brut**. Le guide et le rapport documentent SeaMat 3.1 ; les applications de bureau sont publiées en version 3.1.1.
+
+## 3. Faire une première simulation
+
+1. Choisir un matériau dans **Matériaux**, ou créer une fiche personnalisée.
+2. Ouvrir **Simuler** et renseigner le module initial, les conditions de service et la durée.
+3. Cliquer sur **Calculer**, puis consulter la courbe et le niveau de preuve associé.
+4. Utiliser **Comparer** pour confronter plusieurs scénarios dans les mêmes conditions.
+5. Exporter les résultats en **Excel ou PDF** pour conserver les paramètres et les conclusions.
+
+La courbe est une estimation. Sa portée dépend des données disponibles et du domaine de validation affiché ; les tests informatiques ne garantissent pas une précision expérimentale universelle.
+
+![Aperçu de SeaMat](docs/assets/apercu-seamat.png)
+
+## 4. Se repérer dans le dépôt
+
+| Vous cherchez… | Ouvrir |
 |---|---|
-| **Windows 10/11, 64 bits** | [Télécharger SeaMat-Windows-x64.exe](https://github.com/chillneonpro-bot/SeaMat/releases/latest/download/SeaMat-Windows-x64.exe) |
-| **macOS Apple Silicon** — M1, M2, M3, M4… | [Télécharger SeaMat-macOS-Apple-Silicon.zip](https://github.com/chillneonpro-bot/SeaMat/releases/latest/download/SeaMat-macOS-Apple-Silicon.zip) |
-| **macOS Intel** | [Télécharger SeaMat-macOS-Intel.zip](https://github.com/chillneonpro-bot/SeaMat/releases/latest/download/SeaMat-macOS-Intel.zip) |
+| Comment utiliser GitHub, télécharger les fichiers et mettre à jour SeaMat | [**Mode d’emploi du dépôt**](docs/UTILISER_CE_DEPOT.md) |
+| Les documents du rendu, bien classés | [**Dossier des livrables**](docs/livrables/README.md) |
+| Les méthodes, sources, audits et études de validation | [**Sommaire de la documentation**](docs/README.md) |
+| Les fonctions et le moteur en détail | [Présentation détaillée](docs/PRESENTATION_DETAILLEE.md) |
+| Installer depuis le code ou déployer dans une école | [Installation](docs/INSTALLATION.md) · [Déploiement institutionnel](docs/DEPLOIEMENT_INSTITUTIONNEL.md) |
+| Signaler un problème | [Issues du dépôt](https://github.com/chillneonpro-bot/SeaMat/issues) |
 
-Ces versions autonomes ouvrent SeaMat dans une fenêtre d’application et conservent les données dans le profil de l’utilisateur. Consultez la [dernière version publiée](https://github.com/chillneonpro-bot/SeaMat/releases/latest) pour les instructions du premier lancement et les empreintes SHA-256.
-
-### Installation depuis le code source
-
-#### Windows
-
-1. Télécharger le dépôt avec **Code → Download ZIP**.
-2. Extraire complètement le fichier ZIP.
-3. Installer [Python 3.11, 3.12 ou 3.13](https://www.python.org/downloads/) si nécessaire.
-4. Double-cliquer sur **`Lancer-SeaMat-Windows.bat`**.
-
-#### macOS
-
-1. Télécharger puis décompresser le dépôt.
-2. Installer [Python 3.11, 3.12 ou 3.13](https://www.python.org/downloads/) si nécessaire.
-3. Double-cliquer sur **`Lancer-SeaMat.command`**.
-4. Si macOS bloque le premier lancement, faire un clic droit sur le fichier, choisir **Ouvrir**, puis confirmer.
-
-Au premier démarrage, le lanceur crée un environnement isolé et installe automatiquement les dépendances. SeaMat s’ouvre ensuite sur [http://127.0.0.1:8088](http://127.0.0.1:8088).
-
-#### Docker
-
-```sh
-docker compose up --build
-```
-
-Les instructions détaillées, le déploiement pour une classe et les variables de serveur sont décrits dans le [guide d’installation](docs/INSTALLATION.md).
-
-## Parcours conseillé
-
-1. Ouvrir **Matériaux** et sélectionner une fiche ou créer un matériau personnalisé.
-2. Ouvrir **Simuler**, puis choisir une estimation depuis une fiche ou depuis des mesures publiées.
-3. Renseigner le grade, le module initial, les conditions de service, l’horizon et le seuil conservé.
-4. Lire le niveau de preuve et la précision affichée avant d’interpréter la courbe.
-5. Comparer plusieurs matériaux avec les mêmes conditions.
-6. Exporter le classeur Excel ou le rapport et conserver les paramètres avec le résultat.
-
-Le [guide complet](docs/livrables/Guide_complet_utilisation_SeaMat.pdf) explique chaque champ, chaque phrase de l’interface et la manière d’exploiter les résultats.
-
-## Fonctions principales
-
-- Catalogue structuré de **75 matériaux** et profils documentés de module initial.
-- Ajout manuel d’un polymère avec recherche d’analogues et contrôle d’applicabilité.
-- Courbes du module de Young selon le temps, la température, l’humidité, l’épaisseur et le milieu.
-- Paramètres avancés pour les mécanismes thermiques, hydriques, UV et la rigidification.
-- Comparaison de un à quatre matériaux ou simulations enregistrées.
-- Import de séries expérimentales et de mesures publiées.
-- Validation aveugle entre prédictions figées et résultats de laboratoire.
-- Indicateurs d’erreur, de couverture, de domaine et de niveau de preuve.
-- Exports Excel, PDF, JSON et rapports étudiants.
-- Comptes locaux, projets, espace classe et remise de travaux.
-- Bibliothèque de documents et traçabilité des sources.
-
-## Lire correctement un résultat
-
-La **courbe centrale** est l’estimation produite pour les paramètres saisis. La **bande** représente la sensibilité ou l’intervalle prédictif associé au niveau de preuve disponible. Le **temps au seuil** indique quand le module central atteint le pourcentage conservé choisi.
-
-Un résultat n’a pas la même portée selon son origine :
-
-| Niveau affiché | Interprétation |
-|---|---|
-| Mesures compatibles du grade | Résultat le plus directement exploitable dans la fenêtre observée |
-| Modèle validé sur groupes masqués | Prédiction accompagnée de métriques de validation |
-| Transfert par analogue | Estimation de présélection limitée au domaine de l’analogue |
-| Estimation documentaire de famille | Hypothèse de travail à confronter à une expérience |
-
-SeaMat sert à préparer, comparer et documenter une étude. Une courbe extrapolée ne constitue pas à elle seule une qualification, une garantie de durée de vie ou une preuve expérimentale du grade réel.
-
-## Moteur scientifique
-
-La version 3.1 combine des modèles par mécanismes et familles avec des coefficients explicites pour les effets thermiques, hydriques, UV, de diffusion et de rigidification. Lorsqu’une série temporelle compatible existe, SeaMat interpole les observations, compare plusieurs lois de prolongement et mesure l’erreur sur des groupes entièrement masqués. Sans cinétique compatible, l’application produit une estimation documentaire clairement identifiée et réduit la portée annoncée du résultat.
-
-Documents de référence :
-
-- [Moteur par familles et mécanismes](docs/MOTEUR_FAMILLES_V31.md)
-- [Précision et domaine d’applicabilité](docs/MOTEUR_PRECISION_V3.md)
-- [Architecture scientifique](docs/ARCHITECTURE_SCIENTIFIQUE_V2.md)
-- [Audit sur les données réelles](docs/AUDIT_DONNEES_REELLES_V31.md)
-- [Qualification statistique 95/95](docs/VALIDATION_95.md)
-- [Comparaison aux essais réels](docs/COMPARAISON_ESSAIS_REELS_V0.46.md)
-
-## Vérifier l’installation
-
-```sh
-python -m pytest -q
-```
-
-L’intégration continue exécute les tests sous Windows, macOS et Linux avec Python 3.11 et 3.13, puis construit et démarre l’image Docker. Les tests vérifient le moteur, les imports, les exports, les comptes, les droits et les parcours pédagogiques. Ils ne remplacent pas une validation expérimentale indépendante.
-
-## Structure du dépôt
-
-```text
-SeaMat/
-├── seamat/                   application et moteur de calcul
-├── data/evidence/            données scientifiques versionnées
-├── tests/                    tests automatiques
-├── docs/                     guides, rapport, méthode et validation
-├── examples/                 fichiers d’exemple
-├── .github/workflows/        tests Windows, macOS, Linux et Docker
-├── Lancer-SeaMat.command     lancement macOS
-├── Lancer-SeaMat-Windows.bat lancement Windows
-├── compose.yaml              lancement Docker
-└── requirements-lock.txt     dépendances figées
-```
-
-## Données locales et sécurité
-
-Les comptes, sessions, secrets, documents importés, sauvegardes et bases SQLite locales sont exclus du dépôt. Ne publiez jamais les fichiers contenus dans `data/`, `.nicegui/`, `.env`, `output/` ou `tmp/`.
-
-Une instance accessible sur Internet doit utiliser HTTPS, des secrets propres à l’établissement et un volume persistant. Consultez [SECURITY.md](SECURITY.md) et le [déploiement institutionnel](docs/DEPLOIEMENT_INSTITUTIONNEL.md).
-
-## Contribuer
-
-Toute nouvelle donnée doit conserver sa source, son grade, sa norme, son conditionnement et son domaine d’utilisation. Une fiche fabricant peut documenter un module initial, mais elle ne prouve pas une cinétique de vieillissement.
-
-Voir [CONTRIBUTING.md](CONTRIBUTING.md) pour proposer une correction ou un nouveau jeu de données.
+Le code se trouve dans `seamat/`, les tests dans `tests/` et les données scientifiques versionnées dans `data/evidence/`. Les comptes, simulations et documents personnels restent sur votre ordinateur.

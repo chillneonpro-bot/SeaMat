@@ -1,6 +1,20 @@
 # Installer et distribuer SeaMat
 
-## Utilisation locale sur macOS
+## Applications prêtes à ouvrir — méthode recommandée
+
+Depuis [l’accueil du dépôt](../README.md), téléchargez le fichier pour votre ordinateur. Python est inclus dans les applications distribuées.
+
+- **Windows** : ouvrir `SeaMat-Windows-x64.exe`.
+- **Mac Apple Silicon** : décompresser `SeaMat-macOS-Apple-Silicon.zip` et déplacer `SeaMat.app` dans Applications.
+- **Mac Intel** : décompresser `SeaMat-macOS-Intel.zip` et déplacer `SeaMat.app` dans Applications.
+
+Les applications ne disposent pas de certificat commercial Apple/Microsoft. Windows peut afficher SmartScreen ; pour le fichier provenant de ce dépôt, les options **Informations complémentaires → Exécuter quand même** peuvent être proposées. Sur macOS, si l’application est bloquée, consultez **Réglages Système → Confidentialité et sécurité** et l’option **Ouvrir quand même** pour SeaMat lorsqu’elle est proposée. Les règles d’un ordinateur géré par une école peuvent nécessiter l’intervention du service informatique.
+
+Les données des applications sont stockées dans `%LOCALAPPDATA%\SeaMat` sous Windows et `~/Library/Application Support/SeaMat` sous macOS. Voir le [mode d’emploi du dépôt](UTILISER_CE_DEPOT.md) pour les documents et les mises à jour.
+
+Les sections suivantes concernent l’installation depuis le code source.
+
+## Installation depuis le code sur macOS
 
 1. Installer Python 3.11, 3.12 ou 3.13 depuis `python.org`.
 2. Télécharger puis décompresser l'archive GitHub de SeaMat.
@@ -9,7 +23,7 @@
 
 Le lanceur crée `.venv`, installe les versions figées et ouvre le navigateur. Il ne modifie pas l'installation Python du système.
 
-## Utilisation locale sur Windows
+## Installation depuis le code sur Windows
 
 1. Installer Python 3.11, 3.12 ou 3.13 depuis `python.org`. Le lanceur Python `py` est installé par défaut.
 2. Extraire entièrement le ZIP ; ne pas lancer SeaMat depuis l'aperçu de l'archive.

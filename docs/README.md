@@ -2,12 +2,14 @@
 
 Cette page regroupe les documents destinés aux utilisateurs, aux évaluateurs scientifiques et aux personnes chargées du déploiement.
 
+[← Accueil et téléchargements](../README.md) · [Mode d’emploi du dépôt](UTILISER_CE_DEPOT.md) · [Présentation détaillée](PRESENTATION_DETAILLEE.md)
+
 ## Livrables principaux
 
 | Document | Contenu | Formats |
 |---|---|---|
-| Guide complet d’utilisation | Installation, navigation, saisie, paramètres avancés, lecture des indicateurs, comparaison, validation, exports et résolution des problèmes | [PDF](livrables/Guide_complet_utilisation_SeaMat.pdf) · [Word](livrables/Guide_complet_utilisation_SeaMat.docx) |
-| Rapport scientifique | Problématique, état de l’art, méthodes de calcul, architecture, résultats, précision, validation, limites et perspectives | [PDF](livrables/Rapport_scientifique_SeaMat.pdf) · [Word](livrables/Rapport_scientifique_SeaMat.docx) |
+| Guide complet d’utilisation | Installation, navigation, saisie, paramètres avancés, lecture des indicateurs, comparaison, validation, exports et résolution des problèmes | [PDF](livrables/01_Guide_utilisation/SeaMat_Guide_utilisation_complet.pdf) · [Word](livrables/01_Guide_utilisation/SeaMat_Guide_utilisation_complet.docx) |
+| Rapport scientifique | Problématique, état de l’art, méthodes de calcul, architecture, résultats, précision, validation, limites et perspectives | [PDF](livrables/02_Rapport_scientifique/SeaMat_Rapport_scientifique.pdf) · [Word](livrables/02_Rapport_scientifique/SeaMat_Rapport_scientifique.docx) |
 
 Les PDF sont les versions de lecture et d’impression. Les fichiers Word sont fournis pour les corrections, annotations et adaptations pédagogiques.
 

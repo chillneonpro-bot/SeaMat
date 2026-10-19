@@ -1,14 +1,21 @@
-# Livrables SeaMat 3.1
+# Dossier de rendu SeaMat
 
-Ce dossier contient les documents finalisés à transmettre avec le logiciel.
+[← Accueil et applications Windows/Mac](../../README.md) · [Comment utiliser ce dépôt](../UTILISER_CE_DEPOT.md)
 
-| Fichier | Usage |
-|---|---|
-| `Guide_complet_utilisation_SeaMat.pdf` | Lecture, diffusion et impression du guide utilisateur |
-| `Guide_complet_utilisation_SeaMat.docx` | Version modifiable du guide utilisateur |
-| `Rapport_scientifique_SeaMat.pdf` | Lecture, diffusion et impression du rapport scientifique |
-| `Rapport_scientifique_SeaMat.docx` | Version modifiable du rapport scientifique |
+## 01 — Guide d’utilisation
 
-Les deux PDF sont au format A4 et comportent chacun 31 pages. Les captures présentes dans le guide correspondent à l’interface SeaMat 3.1.
+Captures annotées, saisie des paramètres, lecture des résultats, comparaison, exports et résolution des problèmes.
 
-Le fichier [`SHA256SUMS.txt`](SHA256SUMS.txt) permet de vérifier que les quatre livrables téléchargés sont complets et n’ont pas été modifiés.
+- [SeaMat_Guide_utilisation_complet.pdf](01_Guide_utilisation/SeaMat_Guide_utilisation_complet.pdf) — lecture et impression.
+- [SeaMat_Guide_utilisation_complet.docx](01_Guide_utilisation/SeaMat_Guide_utilisation_complet.docx) — version Word modifiable.
+
+## 02 — Rapport scientifique
+
+Contexte, méthode, équations, architecture, précision, validation, limites et perspectives.
+
+- [SeaMat_Rapport_scientifique.pdf](02_Rapport_scientifique/SeaMat_Rapport_scientifique.pdf) — lecture et impression.
+- [SeaMat_Rapport_scientifique.docx](02_Rapport_scientifique/SeaMat_Rapport_scientifique.docx) — version Word modifiable.
+
+Les documents décrivent SeaMat 3.1. La publication 3.1.1 ajoute les applications de bureau. Le contenu des documents est conservé ; seuls leur classement et leurs noms ont changé.
+
+Pour télécharger un document, ouvrez son lien puis choisissez **Download raw file / Télécharger le fichier brut**. Les empreintes du fichier [SHA256SUMS.txt](SHA256SUMS.txt) permettent de contrôler l’intégrité des quatre documents.
