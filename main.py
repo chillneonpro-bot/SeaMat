@@ -214,6 +214,8 @@ def shell(path,title):
     with ui.row().classes('topbar'):
         with ui.row().classes('items-center gap-3'):
             ui.button(icon='menu',on_click=drawer.toggle).props('flat round aria-label="Ouvrir la navigation"').classes('menu-mobile')
+            ui.button('Retour',icon='arrow_back',on_click=lambda:ui.run_javascript("if (document.referrer && new URL(document.referrer).origin === location.origin && history.length > 1) { history.back(); } else { location.assign('/'); }")).props('flat dense aria-label="Revenir à la page précédente"')
+            ui.button(icon='home',on_click=lambda:ui.navigate.to('/')).props('flat round dense aria-label="Accueil"').tooltip('Accueil')
             ui.label('Espace de recherche').classes('crumb'); ui.icon('chevron_right',size='16px',color='grey'); ui.label(title).classes('text-sm font-medium')
         with ui.row().classes('items-center gap-3'):
             user=current_user()
@@ -1989,7 +1991,7 @@ def datasets():
                     ui.label('Importer une série expérimentale').classes('section-title')
                     ui.label('CSV UTF-8 ou Excel .xlsx. Le format exige température, humidité relative, temps, épaisseur, E et E₀ ; SeaMat calcule E/E₀. Chaque mesure conserve son expérience, son protocole et sa source.').classes('body-copy')
                     out=io.StringIO(); w=csv.writer(out); w.writerow(REQUIRED)
-                    for g,temp,rh,thickness in [('SYNTH-A',40,60,1.0),('SYNTH-B',60,75,1.5),('SYNTH-C',80,90,2.0)]:
+                    for g,temp,rh,thickness in [('SYNTH-A',40,60,1.0),('SYNTH-B',40,60,1.0),('SYNTH-C',40,60,1.0)]:
                         for hours in [0,240,480,960]:
                             e0=2000; e=e0*np.exp(-hours*(0.00005+temp/4_000_000+rh/8_000_000)/thickness)
                             w.writerow([g,hours,'hours',round(e,3),'MPa',e0,'MPa',temp,rh,thickness,23,'SYNTHETIC-example','tensile','Données synthétiques pédagogiques',f'{g}, t={hours} h'])
@@ -1997,14 +1999,19 @@ def datasets():
                         ui.button('Modèle Excel',icon='table_view',on_click=lambda:ui.download(
                             experiments.measurement_template_xlsx(),'modele-campagne-seamat.xlsx',MIME_XLSX)).props('outline')
                         ui.button('Exemple CSV',icon='download',on_click=lambda:ui.download(out.getvalue().encode(),'exemple-synthetique.csv','text/csv')).props('outline')
+                    import_status=ui.label('Choisissez un fichier Excel ou CSV. Les résultats de l’import apparaîtront ici.').classes('small')
                     async def upload(e):
+                        import_status.set_text('Import en cours…')
                         try:
                             raw=await e.file.read(); rows=await run.io_bound(experiments.parse_measurement_file,raw,e.file.name)
                             quality=experiments.quality_report(rows)
                             store.save(own,'dataset',e.file.name,dict(rows=rows,quality=quality,status='pending',origin='user_import',note='Source déclarée par l’importateur, non vérifiée scientifiquement'))
+                            import_status.set_text(f"{len(rows)} mesures importées depuis {e.file.name}. {quality['status']}. Consultez la campagne ci-dessous.")
                             ui.notify(f"{len(rows)} mesures importées. {quality['status']}.",type='positive' if quality['ready_for_review'] else 'warning'); imported.refresh()
-                        except ValueError as exc: ui.notify(str(exc),type='negative')
-                        except Exception: logging.exception('Import failed'); ui.notify('Le fichier n’a pas pu être importé.',type='negative')
+                        except ValueError as exc:
+                            import_status.set_text('Import refusé : '+str(exc)); ui.notify(str(exc),type='negative')
+                        except Exception:
+                            logging.exception('Import failed'); import_status.set_text('Échec de l’import. Vérifiez le format du fichier puis réessayez.'); ui.notify('Le fichier n’a pas pu être importé.',type='negative')
                     ui.upload(label='Déposer un fichier CSV ou Excel',auto_upload=True,max_file_size=5_000_000,on_upload=upload,on_rejected=lambda:ui.notify('Fichier refusé : CSV ou XLSX de 5 Mo maximum.',type='negative')).props('accept=.csv,.xlsx').classes('w-full')
                     with ui.expansion('Ou coller des mesures au format CSV',icon='content_paste').classes('w-full'):
                         pasted=ui.textarea('Contenu CSV avec en-têtes',placeholder=','.join(REQUIRED)).props('outlined').classes('w-full p-3')
@@ -2422,6 +2429,9 @@ def flax_validation_api():
 
 def run_application(*, native_mode: bool = False) -> None:
     """Start SeaMat either as a local web app or as a packaged desktop app."""
+    if native_mode:
+        app.native.settings['ALLOW_DOWNLOADS']=True
+        app.native.settings['OPEN_EXTERNAL_LINKS_IN_BROWSER']=True
     teacher_token,teacher_created=auth.ensure_server_token('SEAMAT_TEACHER_TOKEN','.teacher_token','ENS')
     review_token,review_created=auth.ensure_server_token('SEAMAT_REVIEW_TOKEN','.review_token','REV')
     if teacher_created:

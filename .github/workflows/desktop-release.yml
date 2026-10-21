@@ -43,7 +43,7 @@ jobs:
             foreach ($attempt in 1..120) {
               try {
                 $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8088/health' -TimeoutSec 3
-                if ($health.status -eq 'ok' -and $health.version -eq '3.1.1') { $ready = $true; break }
+                if ($health.status -eq 'ok' -and $health.version -eq '3.1.2') { $ready = $true; break }
               } catch {}
               Start-Sleep -Seconds 2
             }
@@ -101,7 +101,7 @@ jobs:
           ready=0
           for attempt in {1..120}; do
             if health=$(curl --fail --silent http://127.0.0.1:8088/health); then
-              python -c "import json,sys; d=json.loads(sys.argv[1]); assert d['status']=='ok' and d['version']=='3.1.1'" "$health"
+              python -c "import json,sys; d=json.loads(sys.argv[1]); assert d['status']=='ok' and d['version']=='3.1.2'" "$health"
               ready=1
               break
             fi
@@ -138,4 +138,4 @@ jobs:
       - name: Publier la version téléchargeable
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" release/* --title "SeaMat 3.1.1 — Windows et macOS" --notes-file packaging/RELEASE_NOTES.md
+        run: gh release create "$GITHUB_REF_NAME" release/* --title "SeaMat 3.1.2 — Windows et macOS" --notes-file packaging/RELEASE_NOTES.md

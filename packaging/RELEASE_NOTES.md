@@ -1,6 +1,17 @@
-# SeaMat 3.1.1 — applications de bureau
+# SeaMat 3.1.2 — applications de bureau
 
-Cette version ajoute des applications autonomes : Python n’a pas besoin d’être installé.
+Cette version corrige les téléchargements et les imports et ajoute une navigation de retour. Python n’a pas besoin d’être installé.
+
+## Corrections 3.1.2
+
+- Téléchargements activés dans les fenêtres natives Windows et macOS (modèles Excel et exports).
+- Boutons Retour et Accueil disponibles sur chaque page.
+- CSV français : séparateur point-virgule, virgules décimales et espaces d’en-têtes acceptés.
+- Lecture de l’onglet Mesures même si le classeur s’ouvre sur le mode d’emploi.
+- Modèle Excel synthétique cohérent pour tester l’import puis l’ajustement ; remplacer ses valeurs par les mesures réelles.
+- Message d’import persistant et erreurs de saisie plus explicites.
+
+Fermez l’ancienne application et remplacez-la par la nouvelle. Les données restent dans le même dossier utilisateur.
 
 ## Télécharger
 

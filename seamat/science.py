@@ -91,15 +91,26 @@ REQUIRED = ['experiment_id','time','time_unit','modulus','modulus_unit','initial
             'temperature_C','humidity_RH','thickness_mm','measurement_temperature_C',
             'material','protocol','source','location']
 def parse_measurements(raw: bytes) -> list[dict]:
-    if len(raw)>2_000_000: raise ValueError('Fichier trop volumineux : maximum 2 Mo.')
+    if len(raw)>5_000_000: raise ValueError('Fichier trop volumineux : maximum 5 Mo.')
     try:
-        text=raw.decode('utf-8-sig'); reader=csv.DictReader(io.StringIO(text))
+        text=raw.decode('utf-8-sig')
+        first_line=text.splitlines()[0] if text.splitlines() else ''
+        delimiter=';' if first_line.count(';')>first_line.count(',') else ','
+        reader=csv.DictReader(io.StringIO(text),delimiter=delimiter)
+        if reader.fieldnames:
+            reader.fieldnames=[name.strip() for name in reader.fieldnames]
         if not reader.fieldnames or not set(REQUIRED)<=set(reader.fieldnames):
             raise ValueError('Colonnes manquantes. Utilisez le modèle CSV proposé.')
         rows=[]; seen=set()
         for i,row in enumerate(reader,2):
             if len(rows)>=10000: raise ValueError('Maximum 10 000 mesures par fichier.')
             if any(row.get(k) is None or not str(row[k]).strip() for k in REQUIRED): raise ValueError(f'Ligne {i} : un champ obligatoire est vide.')
+            row={k:v.strip() if isinstance(v,str) else v for k,v in row.items()}
+            for field in ('time','modulus','initial_modulus','temperature_C','humidity_RH','thickness_mm','measurement_temperature_C'):
+                value=row[field].replace('\u202f','').replace('\u00a0','').replace(',','.')
+                try: float(value)
+                except ValueError as exc: raise ValueError(f'Ligne {i} : valeur numérique invalide dans {field}.') from exc
+                row[field]=value
             tf={'days':1.,'hours':1/24,'seconds':1/86400}.get(row['time_unit'])
             ef={'MPa':1.,'GPa':1000.,'Pa':1e-6}.get(row['modulus_unit'])
             e0f={'MPa':1.,'GPa':1000.,'Pa':1e-6}.get(row['initial_modulus_unit'])

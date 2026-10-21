@@ -22,7 +22,7 @@ def parse_measurement_file(raw: bytes, filename: str) -> list[dict]:
         raise ValueError('Classeur trop volumineux : maximum 5 Mo.')
     try:
         workbook=load_workbook(io.BytesIO(raw),read_only=True,data_only=True)
-        sheet=workbook.active
+        sheet=workbook['Mesures'] if 'Mesures' in workbook.sheetnames else workbook.active
         iterator=sheet.iter_rows(values_only=True)
         headers=[str(value).strip() if value is not None else '' for value in next(iterator)]
         if not set(REQUIRED)<=set(headers):
@@ -36,6 +36,7 @@ def parse_measurement_file(raw: bytes, filename: str) -> list[dict]:
             writer.writerow(list(row)); count+=1
             if count>10000:
                 raise ValueError('Maximum 10 000 mesures par fichier.')
+        workbook.close()
         return parse_measurements(out.getvalue().encode('utf-8'))
     except ValueError:
         raise
@@ -97,7 +98,7 @@ def measurement_template_xlsx() -> bytes:
     number=workbook.add_format({'num_format':'0.000'}); note=workbook.add_format({'text_wrap':True,'valign':'top'})
     data.write_row(0,0,REQUIRED,header)
     samples=[]
-    for experiment,temp,rh,thickness in [('EXPERIENCE-A',40,60,1.0),('EXPERIENCE-B',60,75,1.5)]:
+    for experiment,temp,rh,thickness in [('EXPERIENCE-A',40,60,1.0),('EXPERIENCE-B',40,60,1.0)]:
         for hours in (0,240,480,960):
             e0=2000.; modulus=e0*math.exp(-hours*(0.00005+temp/4_000_000+rh/8_000_000)/thickness)
             samples.append([experiment,hours,'hours',round(modulus,3),'MPa',e0,'MPa',temp,rh,thickness,23,'MATERIAL-ID','tensile','Référence complète ou DOI',f'Tableau/figure, {experiment}, t={hours} h'])
@@ -107,7 +108,9 @@ def measurement_template_xlsx() -> bytes:
     data.freeze_panes(1,2); data.set_column(0,0,20); data.set_column(1,12,17); data.set_column(13,14,34)
     guide.set_column('A:A',28); guide.set_column('B:B',90); guide.hide_gridlines(2)
     guide.write_row(0,0,['Champ','Règle'],header)
-    rules=[('Une ligne','Une mesure moyenne à un temps donné. Utilisez des identifiants d’expérience différents pour les campagnes indépendantes.'),
+    rules=[('Exemples synthétiques','Les valeurs préremplies sont fictives. Remplacez-les par vos mesures avant une utilisation scientifique.'),
+           ('Conditions','Pour ajuster une courbe, importer un seul matériau à conditions identiques. Séparer les températures en fichiers distincts.'),
+           ('Une ligne','Une mesure moyenne à un temps donné. Utilisez des identifiants d’expérience différents pour les campagnes indépendantes.'),
            ('Unités','Temps : hours, days ou seconds. Module : MPa, GPa ou Pa. SeaMat normalise ensuite en jours et MPa.'),
            ('Protocole','La version actuelle accepte tensile. Décrivez la norme, la vitesse et la température dans la source et l’emplacement.'),
            ('Répétitions','Conservez les données brutes par éprouvette dans votre archive de laboratoire. Ce fichier importe une valeur par expérience et temps.'),
